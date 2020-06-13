@@ -5,8 +5,9 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Badge from 'react-bootstrap/Badge';
 import { AiOutlineFile } from 'react-icons/ai';
+import { AiOutlineDelete } from 'react-icons/ai';
 
-const File = ({ file }) => {
+const File = ({ file, deleteFunc }) => {
   return (
     <tr>
       <td>
@@ -20,7 +21,11 @@ const File = ({ file }) => {
         <Moment format="MMM Do YYYY">{new Date(file.created)}</Moment>
       </td>
       <td>{filesize(file.versions[0].size)}</td>
-      <td>x</td>
+      <td>
+        <Button onClick={() => deleteFunc(file.versions[0].handle)}>
+          <AiOutlineDelete></AiOutlineDelete>
+        </Button>
+      </td>
     </tr>
   );
 };

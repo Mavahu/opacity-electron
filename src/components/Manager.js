@@ -15,6 +15,7 @@ const Manager = () => {
   const [folderPath, setFolderPath] = useState('/');
   const [folders, setFolders] = useState(['Main']);
   const [metadata, setMetadata] = useState({
+    name: 'Folder',
     files: [
       {
         name: 'UAM Vergütungsvereinbarung.pdf',
@@ -41,9 +42,8 @@ const Manager = () => {
   });
 
   useEffect(() => {
-    ipcRenderer.on('files:get', (e, metadata) => {
-      console.log(metadata);
-      setMetadata(metadata);
+    ipcRenderer.on('files:get', (e, newMetadata) => {
+      setMetadata(newMetadata);
     });
   }, []);
 
@@ -65,6 +65,13 @@ const Manager = () => {
     traversedPath = slash(path.join(...traversedPath));
     setFolderPath(traversedPath);
     ipcRenderer.send('path:update', traversedPath);
+  }
+
+  function deleteFunc(handle) {
+    ipcRenderer.send('file:delete', {
+      folder: folderPath,
+      handle: handle,
+    });
   }
 
   return (
@@ -98,7 +105,7 @@ const Manager = () => {
             );
           })}
           {metadata.files.map((file, index) => {
-            return <File key={index} file={file} />;
+            return <File key={index} file={file} deleteFunc={deleteFunc} />;
           })}
         </tbody>
       </Table>

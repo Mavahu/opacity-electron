@@ -3,7 +3,7 @@ const slash = require('slash');
 const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, webContents } = require('electron');
-const OpacityAccount = require('./opacity/Opacity');
+const OpacityAccount = require('./opacity/OpacityAccount');
 
 let mainWindow;
 let account;
@@ -76,7 +76,7 @@ ipcMain.on('login:restore', async (e) => {
     mainWindow.webContents.send('login:success');
     account = new OpacityAccount(password);
     await account.checkAccountStatus();
-    files = await account.getFolderMetadata('/');
+    files = (await account.getFolderMetadata('/')).metadata;
     mainWindow.webContents.send('files:get', files);
   }
 });
@@ -92,7 +92,7 @@ ipcMain.on('handle:set', async (e, handleObject) => {
     }
 
     mainWindow.webContents.send('login:success');
-    files = await account.getFolderMetadata('/');
+    files = (await account.getFolderMetadata('/')).metadata;
     mainWindow.webContents.send('files:get', files);
   } catch (err) {
     console.log(err);
@@ -100,7 +100,13 @@ ipcMain.on('handle:set', async (e, handleObject) => {
 });
 
 ipcMain.on('path:update', async (e, newPath) => {
-  files = await account.getFolderMetadata(newPath);
+  files = (await account.getFolderMetadata(newPath)).metadata;
+  mainWindow.webContents.send('files:get', files);
+});
+
+ipcMain.on('file:delete', async (e, file) => {
+  await account.delete(file.folder, file.handle);
+  const files = (await account.getFolderMetadata(file.folder)).metadata;
   mainWindow.webContents.send('files:get', files);
 });
 
