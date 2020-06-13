@@ -4,8 +4,9 @@ import Button from 'react-bootstrap/Button';
 import Badge from 'react-bootstrap/Badge';
 import { AiOutlineFile } from 'react-icons/ai';
 import { AiFillFolder } from 'react-icons/ai';
+import { ipcRenderer } from 'electron';
 
-const Folder = ({ folder }) => {
+const Folder = ({ folder, updatePath }) => {
   return (
     <tr>
       <td>
@@ -15,7 +16,9 @@ const Folder = ({ folder }) => {
         <AiFillFolder />
       </td>
       <td>
-        <Button variant="outline-info">{folder.name.slice(0, 64)}</Button>
+        <Button variant="outline-info" onClick={() => updatePath(folder.name)}>
+          {folder.name.slice(0, 64)}
+        </Button>
       </td>
       <td></td>
       <td></td>

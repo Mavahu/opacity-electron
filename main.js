@@ -1,5 +1,7 @@
 const path = require('path');
+const slash = require('slash');
 const url = require('url');
+const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, webContents } = require('electron');
 const OpacityAccount = require('./opacity/Opacity');
 
@@ -68,16 +70,38 @@ function createMainWindow() {
 
 app.on('ready', createMainWindow);
 
-ipcMain.on('handle:set', async (e, handle) => {
-  try {
-    account = new OpacityAccount(handle);
+ipcMain.on('login:restore', async (e) => {
+  password = await keytar.getPassword('Opacity', 'Handle');
+  if (password) {
+    mainWindow.webContents.send('login:success');
+    account = new OpacityAccount(password);
     await account.checkAccountStatus();
+    files = await account.getFolderMetadata('/');
+    mainWindow.webContents.send('files:get', files);
+  }
+});
+
+ipcMain.on('handle:set', async (e, handleObject) => {
+  try {
+    account = new OpacityAccount(handleObject.handle);
+    await account.checkAccountStatus();
+
+    if (handleObject.saveHandle) {
+      // save handle to keyring
+      keytar.setPassword('Opacity', 'Handle', handleObject.handle);
+    }
+
     mainWindow.webContents.send('login:success');
     files = await account.getFolderMetadata('/');
     mainWindow.webContents.send('files:get', files);
   } catch (err) {
     console.log(err);
   }
+});
+
+ipcMain.on('path:update', async (e, newPath) => {
+  files = await account.getFolderMetadata(newPath);
+  mainWindow.webContents.send('files:get', files);
 });
 
 app.on('window-all-closed', () => {

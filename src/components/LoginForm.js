@@ -8,14 +8,17 @@ import { useHistory } from 'react-router-dom';
 const LoginForm = () => {
   const history = useHistory();
   const [handle, setHandle] = useState('');
+  const [save, setSave] = useState(false);
 
   useEffect(() => {
+    ipcRenderer.send('login:restore');
+
     ipcRenderer.on('login:success', (e) => history.push('manager'));
   }, []);
 
   const onSubmit = (e) => {
     e.preventDefault();
-    ipcRenderer.send('handle:set', handle);
+    ipcRenderer.send('handle:set', { handle: handle, saveHandle: save });
   };
 
   return (
@@ -28,6 +31,12 @@ const LoginForm = () => {
             placeholder="Enter your handle here"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
+          />
+          <Form.Check
+            type="checkbox"
+            label="Save handle"
+            value={save}
+            onChange={(e) => setSave(e.target.value)}
           />
         </Form.Group>
         <Button variant="primary" type="submit">

@@ -28,6 +28,7 @@
     "bootstrap": "^4.5.0",
     "eth-crypto": "^1.6.0",
     "filesize": "^6.1.0",
+    "keytar": "^6.0.1",
     "moment": "^2.26.0",
     "react": "^16.13.1",
     "react-bootstrap": "^1.0.1",
@@ -35,6 +36,7 @@
     "react-icons": "^3.10.0",
     "react-moment": "^0.9.7",
     "react-router-dom": "^5.2.0",
+    "slash": "^3.0.0",
     "web3": "^1.2.9"
   },
   "devDependencies": {

@@ -1,14 +1,19 @@
+import { ipcRenderer } from 'electron';
+import path from 'path';
+import slash from 'slash';
 import React, { useState, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
+import Card from 'react-bootstrap/Card';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
-import { ipcRenderer } from 'electron';
 import File from './File';
 import Folder from './Folder';
 
 const Manager = () => {
+  const [folderPath, setFolderPath] = useState('/');
+  const [folders, setFolders] = useState(['Main']);
   const [metadata, setMetadata] = useState({
     files: [
       {
@@ -41,22 +46,56 @@ const Manager = () => {
       setMetadata(metadata);
     });
   }, []);
+
+  function updatePath(newPath) {
+    const updatedPath = slash(path.join(folderPath, newPath));
+    ipcRenderer.send('path:update', updatedPath);
+    setFolderPath(updatedPath);
+    setFolders([...folders, newPath]);
+  }
+
+  function goBackTo(buttonIndex) {
+    /*if (folders[folders.length - 1] == goToPath) {
+      return;
+    }*/
+    const newPath = folders.slice(0, buttonIndex + 1);
+    setFolders(newPath);
+    let traversedPath = [...newPath];
+    traversedPath[0] = '/';
+    traversedPath = slash(path.join(...traversedPath));
+    setFolderPath(traversedPath);
+    ipcRenderer.send('path:update', traversedPath);
+  }
+
   return (
     <Container>
+      <Row>
+        {folders.map((folder, index) => {
+          //if (folders.length - 1 != index) {
+          return (
+            <Card key={index}>
+              <Button onClick={() => goBackTo(index)}>{folder}</Button>
+            </Card>
+          );
+          //}
+        })}
+      </Row>
       <Table>
         <thead>
           <tr>
             <th></th>
             <th></th>
             <th>Name</th>
-            <th>Size</th>
             <th>Created</th>
+            <th>Size</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {metadata.folders.map((folder, index) => {
-            return <Folder key={index} folder={folder} />;
+            return (
+              <Folder key={index} folder={folder} updatePath={updatePath} />
+            );
           })}
           {metadata.files.map((file, index) => {
             return <File key={index} file={file} />;
