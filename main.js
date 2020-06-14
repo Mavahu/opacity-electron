@@ -2,13 +2,15 @@ const path = require('path');
 const slash = require('slash');
 const url = require('url');
 const keytar = require('keytar');
-const { app, BrowserWindow, ipcMain, webContents } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { useHistory } = require('react-router-dom');
 const OpacityAccount = require('./opacity/OpacityAccount');
 
 let mainWindow;
 let account;
 
 let isDev = false;
+const isMac = process.platform === 'darwin' ? true : false;
 
 if (
   process.env.NODE_ENV !== undefined &&
@@ -68,7 +70,41 @@ function createMainWindow() {
   mainWindow.on('closed', () => (mainWindow = null));
 }
 
-app.on('ready', createMainWindow);
+app.on('ready', () => {
+  createMainWindow();
+
+  const mainMenu = Menu.buildFromTemplate(menu);
+  Menu.setApplicationMenu(mainMenu);
+});
+
+const menu = [
+  ...(isMac ? [{ role: 'appMenu' }] : []),
+  { role: 'fileMenu' },
+  {
+    label: 'Handle',
+    submenu: [{ label: 'Reset Handle', click: () => resetHandle() }],
+  },
+  ...(isDev
+    ? [
+        {
+          label: 'Developer',
+          submenu: [
+            {
+              role: 'reload',
+              role: 'forcereload',
+              role: 'separator',
+              role: 'toggledevtools',
+            },
+          ],
+        },
+      ]
+    : []),
+];
+
+async function resetHandle() {
+  await keytar.deletePassword('Opacity', 'Handle');
+  app.quit();
+}
 
 ipcMain.on('login:restore', async (e) => {
   password = await keytar.getPassword('Opacity', 'Handle');
@@ -76,8 +112,7 @@ ipcMain.on('login:restore', async (e) => {
     mainWindow.webContents.send('login:success');
     account = new OpacityAccount(password);
     await account.checkAccountStatus();
-    files = (await account.getFolderMetadata('/')).metadata;
-    mainWindow.webContents.send('files:get', files);
+    refreshFolder('/');
   }
 });
 
@@ -92,23 +127,34 @@ ipcMain.on('handle:set', async (e, handleObject) => {
     }
 
     mainWindow.webContents.send('login:success');
-    files = (await account.getFolderMetadata('/')).metadata;
-    mainWindow.webContents.send('files:get', files);
+    refreshFolder('/');
   } catch (err) {
     console.log(err);
   }
 });
 
 ipcMain.on('path:update', async (e, newPath) => {
-  files = (await account.getFolderMetadata(newPath)).metadata;
-  mainWindow.webContents.send('files:get', files);
+  refreshFolder(newPath);
 });
 
 ipcMain.on('file:delete', async (e, file) => {
   await account.delete(file.folder, file.handle);
-  const files = (await account.getFolderMetadata(file.folder)).metadata;
-  mainWindow.webContents.send('files:get', files);
+  refreshFolder(file.folder);
 });
+
+ipcMain.on('files:upload', async (e, toUpload) => {
+  console.log(toUpload);
+  for (const file of toUpload.files) {
+    if (await account.uploadFile(toUpload.folder, file)) {
+      refreshFolder(toUpload.folder);
+    }
+  }
+});
+
+async function refreshFolder(folder) {
+  const files = (await account.getFolderMetadata(folder)).metadata;
+  mainWindow.webContents.send('files:get', files);
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

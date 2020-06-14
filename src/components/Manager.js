@@ -1,19 +1,26 @@
 import { ipcRenderer } from 'electron';
-import path from 'path';
+import Path from 'path';
 import slash from 'slash';
 import React, { useState, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import Card from 'react-bootstrap/Card';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
+import Form from 'react-bootstrap/Form';
 import File from './File';
 import Folder from './Folder';
+import FormGroup from 'react-bootstrap/FormGroup';
+import FormLabel from 'react-bootstrap/FormLabel';
+import FormControl from 'react-bootstrap/FormControl';
 
 const Manager = () => {
+  const [files, setFiles] = useState([]);
   const [folderPath, setFolderPath] = useState('/');
-  const [folders, setFolders] = useState(['Main']);
+  const [folders, setFolders] = useState(['All Files']);
   const [metadata, setMetadata] = useState({
     name: 'Folder',
     files: [
@@ -48,7 +55,7 @@ const Manager = () => {
   }, []);
 
   function updatePath(newPath) {
-    const updatedPath = slash(path.join(folderPath, newPath));
+    const updatedPath = slash(Path.join(folderPath, newPath));
     ipcRenderer.send('path:update', updatedPath);
     setFolderPath(updatedPath);
     setFolders([...folders, newPath]);
@@ -62,7 +69,7 @@ const Manager = () => {
     setFolders(newPath);
     let traversedPath = [...newPath];
     traversedPath[0] = '/';
-    traversedPath = slash(path.join(...traversedPath));
+    traversedPath = slash(Path.join(...traversedPath));
     setFolderPath(traversedPath);
     ipcRenderer.send('path:update', traversedPath);
   }
@@ -74,19 +81,82 @@ const Manager = () => {
     });
   }
 
+  function uploadFiles(e, isFolder = false) {
+    if (e.target.files.length !== 0) {
+      if (isFolder) {
+        const absolutPath = e.target.files[0].path;
+        const relativePath = e.target.files[0].webkitRelativePath;
+        const fldPath =
+          absolutPath.slice(0, absolutPath.length - relativePath.length) +
+          relativePath.split('/')[0];
+
+        ipcRenderer.send('files:upload', {
+          folder: folderPath,
+          files: [fldPath],
+        });
+      } else {
+        const files = [];
+        for (const file of e.target.files) {
+          files.push(file.path);
+        }
+        ipcRenderer.send('files:upload', {
+          folder: folderPath,
+          files: files,
+        });
+      }
+    } else {
+      console.log('No files selected!');
+    }
+  }
+
   return (
     <Container>
-      <Row>
-        {folders.map((folder, index) => {
-          //if (folders.length - 1 != index) {
-          return (
-            <Card key={index}>
-              <Button onClick={() => goBackTo(index)}>{folder}</Button>
-            </Card>
-          );
-          //}
-        })}
-      </Row>
+      <ButtonToolbar
+        className="justify-content-between"
+        aria-label="Toolbar with Button groups"
+      >
+        <ButtonGroup>
+          {folders.map((folder, index) => {
+            //if (folders.length - 1 != index) {
+            return (
+              <Card key={index}>
+                <Button onClick={() => goBackTo(index)}>{folder}</Button>
+              </Card>
+            );
+            //}
+          })}
+        </ButtonGroup>
+        <input
+          id="uploadFolders"
+          type="file"
+          onChange={(e) => uploadFiles(e, true)}
+          hidden
+          webkitdirectory=""
+        />
+        <input
+          id="uploadFiles"
+          type="file"
+          onChange={uploadFiles}
+          hidden
+          multiple
+        />
+        <ButtonGroup>
+          <Card>
+            <Button
+              onClick={() => document.getElementById('uploadFolders').click()}
+            >
+              Upload Folder
+            </Button>
+          </Card>
+          <Card>
+            <Button
+              onClick={() => document.getElementById('uploadFiles').click()}
+            >
+              Upload Files
+            </Button>
+          </Card>
+        </ButtonGroup>
+      </ButtonToolbar>
       <Table>
         <thead>
           <tr>
