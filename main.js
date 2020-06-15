@@ -1,5 +1,5 @@
-const path = require('path');
-const slash = require('slash');
+const Path = require('path');
+const Slash = require('slash');
 const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
@@ -24,7 +24,7 @@ function createMainWindow() {
     width: isDev ? 1600 : 1200,
     height: 800,
     show: false,
-    icon: './assets/icons/logo.png',
+    icon: `${__dirname}/assets/icons/logo.png`,
     webPreferences: {
       nodeIntegration: true,
     },
@@ -42,7 +42,7 @@ function createMainWindow() {
   } else {
     indexPath = url.format({
       protocol: 'file:',
-      pathname: path.join(__dirname, 'dist', 'index.html'),
+      pathname: Path.join(__dirname, 'dist', 'index.html'),
       slashes: true,
     });
   }
@@ -148,6 +148,16 @@ ipcMain.on('files:upload', async (e, toUpload) => {
     if (await account.uploadFile(toUpload.folder, file)) {
       refreshFolder(toUpload.folder);
     }
+  }
+});
+
+ipcMain.on('folder:create', async (e, newFolder) => {
+  console.log(newFolder);
+  const folderPath = Slash(
+    Path.join(newFolder.parentFolder, newFolder.folderName)
+  );
+  if (await account.createFolder(folderPath)) {
+    refreshFolder(newFolder.parentFolder);
   }
 });
 

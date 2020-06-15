@@ -26,6 +26,18 @@ class Helper {
     return result;
   }
 
+  static generateHashedFolderKey(folderKey) {
+    return EthCrypto.hash
+      .keccak256(folderKey.publicKey.toString('hex'))
+      .slice(2);
+  }
+
+  static generateFolderKeystring(folderKey) {
+    return EthCrypto.hash
+      .keccak256(folderKey.privateKey.toString('hex'))
+      .slice(2);
+  }
+
   static decrypt(encryptedData, key) {
     const raw = encryptedData.slice(0, encryptedData.length - 32);
     const tag = encryptedData.slice(raw.length, raw.length + 16);

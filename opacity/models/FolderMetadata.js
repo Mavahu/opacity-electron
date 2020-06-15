@@ -120,6 +120,7 @@ class FolderMetadata {
 
 module.exports = {
   FolderMetadata,
+  FolderMetadataFolder,
   FolderMetadataFile,
   FolderMetadataFileVersion,
 };

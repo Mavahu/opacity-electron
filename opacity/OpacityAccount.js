@@ -4,6 +4,7 @@ const EthCrypto = require('eth-crypto');
 const AccountStatus = require('./models/AccountStatus');
 const {
   FolderMetadata,
+  FolderMetadataFolder,
   FolderMetadataFile,
   FolderMetadataFileVersion,
 } = require('./models/FolderMetadata');
@@ -86,13 +87,9 @@ class OpacityAccount {
   }
 
   async getFolderMetadata(folder) {
-    const folderKey = Helper.getFolderHDKey(this.masterKey, folder);
-    const hashedFolderKey = EthCrypto.hash
-      .keccak256(folderKey.publicKey.toString('hex'))
-      .slice(2);
-    const keyString = EthCrypto.hash
-      .keccak256(folderKey.privateKey.toString('hex'))
-      .slice(2);
+    const { hashedFolderKey, keyString } = this._createMetadataKeyAndKeyString(
+      folder
+    );
 
     const fmd = await this._getFolderMetadataRequest(
       hashedFolderKey,
@@ -310,7 +307,6 @@ class OpacityAccount {
     metadata.metadata.files.push(fileInfo);
     await this._setMetadata(metadata);
     console.log(`Uploaded file: ${fileData.name}`);
-    return true;
   }
 
   async _uploadFilePart(
@@ -478,6 +474,76 @@ class OpacityAccount {
 
     const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
     Fs.writeFileSync(fileToWriteTo, response.data);
+  }
+
+  async createFolder(folderPath) {
+    const parentFolder = Path.dirname(folderPath);
+    const folderName = Path.basename(folderPath);
+    const { metadata, add } = await this._createMetadataFolder(folderPath);
+    if (add === true) {
+      const newFolder = new FolderMetadataFolder(
+        folderName,
+        metadata.hashedFolderKey
+      );
+      const parentMetadata = await this.getFolderMetadata(parentFolder);
+      parentMetadata.metadata.folders.push(newFolder);
+      await this._setMetadata(parentMetadata);
+      console.log(`Created successfully: ${folderPath}`);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  async _createMetadataFolder(folderPath) {
+    const { hashedFolderKey, keyString } = this._createMetadataKeyAndKeyString(
+      folderPath
+    );
+    const requestBody = {
+      timestamp: Date.now(),
+      metadataKey: hashedFolderKey,
+    };
+
+    const rawPayload = JSON.stringify(requestBody);
+    const payload = this._signPayload(rawPayload);
+    const payloadJson = JSON.stringify(payload);
+
+    try {
+      const response = await Axios.post(
+        this.baseUrl + 'metadata/create',
+        payloadJson
+      );
+    } catch (e) {
+      if (e.response.status === 403) {
+        console.log(`The folder: ${folderPath} already exists!`);
+        return { add: false };
+      } else {
+        console.log(e.response);
+        throw e;
+      }
+    }
+
+    const newFolderMetadata = new FolderMetadata(
+      Path.basename(folderPath),
+      Date.now(),
+      Date.now()
+    );
+    const metadata = {
+      metadata: newFolderMetadata,
+      hashedFolderKey: hashedFolderKey,
+      keyString: keyString,
+    };
+
+    await this._setMetadata(metadata);
+    return { metadata: metadata, add: true };
+  }
+
+  _createMetadataKeyAndKeyString(folder) {
+    const folderKey = Helper.getFolderHDKey(this.masterKey, folder);
+    const hashedFolderKey = Helper.generateHashedFolderKey(folderKey);
+    const keyString = Helper.generateFolderKeystring(folderKey);
+
+    return { hashedFolderKey: hashedFolderKey, keyString: keyString };
   }
 }
 

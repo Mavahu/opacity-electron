@@ -109,6 +109,7 @@ const Manager = () => {
     }
   }
 
+  function newFolder() {}
   return (
     <Container>
       <ButtonToolbar
@@ -126,21 +127,24 @@ const Manager = () => {
             //}
           })}
         </ButtonGroup>
-        <input
-          id="uploadFolders"
-          type="file"
-          onChange={(e) => uploadFiles(e, true)}
-          hidden
-          webkitdirectory=""
-        />
-        <input
-          id="uploadFiles"
-          type="file"
-          onChange={uploadFiles}
-          hidden
-          multiple
-        />
         <ButtonGroup>
+          <Card className="mr-1">
+            <Button onClick={newFolder}>Create Folder</Button>
+          </Card>
+          <input
+            id="uploadFolders"
+            type="file"
+            onChange={(e) => uploadFiles(e, true)}
+            hidden
+            webkitdirectory=""
+          />
+          <input
+            id="uploadFiles"
+            type="file"
+            onChange={uploadFiles}
+            hidden
+            multiple
+          />
           <Card>
             <Button
               onClick={() => document.getElementById('uploadFolders').click()}
