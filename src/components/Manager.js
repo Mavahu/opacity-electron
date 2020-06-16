@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+const { dialog } = require('electron').remote;
 import Path from 'path';
 import slash from 'slash';
 import React, { useState, useEffect } from 'react';
@@ -81,32 +82,25 @@ const Manager = () => {
     });
   }
 
-  function uploadFiles(e, isFolder = false) {
-    if (e.target.files.length !== 0) {
-      if (isFolder) {
-        const absolutPath = e.target.files[0].path;
-        const relativePath = e.target.files[0].webkitRelativePath;
-        const fldPath =
-          absolutPath.slice(0, absolutPath.length - relativePath.length) +
-          relativePath.split('/')[0];
-
-        ipcRenderer.send('files:upload', {
-          folder: folderPath,
-          files: [fldPath],
-        });
-      } else {
-        const files = [];
-        for (const file of e.target.files) {
-          files.push(file.path);
+  function uploadButton(e, isFolder = false) {
+    dialog
+      .showOpenDialog({
+        properties: [
+          isFolder ? 'openDirectory' : 'openFile',
+          'multiSelections',
+        ],
+      })
+      .then((result) => {
+        if (!result.canceled) {
+          ipcRenderer.send('files:upload', {
+            folder: folderPath,
+            files: result.filePaths,
+          });
         }
-        ipcRenderer.send('files:upload', {
-          folder: folderPath,
-          files: files,
-        });
-      }
-    } else {
-      console.log('No files selected!');
-    }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
   }
 
   function newFolder() {}
@@ -131,33 +125,13 @@ const Manager = () => {
           <Card className="mr-1">
             <Button onClick={newFolder}>Create Folder</Button>
           </Card>
-          <input
-            id="uploadFolders"
-            type="file"
-            onChange={(e) => uploadFiles(e, true)}
-            hidden
-            webkitdirectory=""
-          />
-          <input
-            id="uploadFiles"
-            type="file"
-            onChange={uploadFiles}
-            hidden
-            multiple
-          />
           <Card>
-            <Button
-              onClick={() => document.getElementById('uploadFolders').click()}
-            >
+            <Button onClick={(e) => uploadButton(e, true)}>
               Upload Folder
             </Button>
           </Card>
           <Card>
-            <Button
-              onClick={() => document.getElementById('uploadFiles').click()}
-            >
-              Upload Files
-            </Button>
+            <Button onClick={uploadButton}>Upload Files</Button>
           </Card>
         </ButtonGroup>
       </ButtonToolbar>

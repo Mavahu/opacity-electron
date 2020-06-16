@@ -307,6 +307,7 @@ class OpacityAccount {
     metadata.metadata.files.push(fileInfo);
     await this._setMetadata(metadata);
     console.log(`Uploaded file: ${fileData.name}`);
+    return true;
   }
 
   async _uploadFilePart(
