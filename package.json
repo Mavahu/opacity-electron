@@ -27,6 +27,7 @@
     "binary-file": "^0.2.3",
     "bip32": "^2.0.5",
     "bootstrap": "^4.5.0",
+    "core-js": "^3.6.5",
     "eth-crypto": "^1.6.0",
     "filesize": "^6.1.0",
     "keytar": "^6.0.1",
@@ -38,6 +39,8 @@
     "react-moment": "^0.9.7",
     "react-router-dom": "^5.2.0",
     "slash": "^3.0.0",
+    "sweetalert2": "^9.15.1",
+    "sweetalert2-react-content": "^3.0.1",
     "web3": "^1.2.9"
   },
   "devDependencies": {

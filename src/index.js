@@ -4,6 +4,8 @@ import { HashRouter as Router, Route } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import Manager from './components/Manager';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'core-js/stable';
+import 'regenerator-runtime/runtime';
 
 // Since we are using HtmlWebpackPlugin WITHOUT a template, we should create our own root node in the body element before rendering into it
 let root = document.createElement('div');

@@ -17,6 +17,8 @@ import Folder from './Folder';
 import FormGroup from 'react-bootstrap/FormGroup';
 import FormLabel from 'react-bootstrap/FormLabel';
 import FormControl from 'react-bootstrap/FormControl';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
 
 const Manager = () => {
   const [files, setFiles] = useState([]);
@@ -103,7 +105,27 @@ const Manager = () => {
       });
   }
 
-  function newFolder() {}
+  async function newFolder() {
+    const { value: folderName } = await Swal.fire({
+      title: 'Enter the folder name',
+      input: 'text',
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (!value) {
+          return 'You need to write something!';
+        }
+      },
+    });
+
+    if (folderName) {
+      Swal.fire('', '', 'success');
+      ipcRenderer.send('folder:create', {
+        parentFolder: folderPath,
+        folderName: folderName,
+      });
+    }
+  }
+
   return (
     <Container>
       <ButtonToolbar
@@ -123,7 +145,7 @@ const Manager = () => {
         </ButtonGroup>
         <ButtonGroup>
           <Card className="mr-1">
-            <Button onClick={newFolder}>Create Folder</Button>
+            <Button onClick={() => newFolder()}>Create Folder</Button>
           </Card>
           <Card>
             <Button onClick={(e) => uploadButton(e, true)}>
