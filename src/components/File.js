@@ -1,13 +1,24 @@
 import React from 'react';
 import Moment from 'react-moment';
-import filesize from 'filesize';
+import Filesize from 'filesize';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import Badge from 'react-bootstrap/Badge';
-import { AiOutlineFile } from 'react-icons/ai';
-import { AiOutlineDelete } from 'react-icons/ai';
+import Swal from 'sweetalert2';
+const Clipboardy = require('clipboardy');
+import {
+  AiOutlineFile,
+  AiOutlineDelete,
+  AiOutlineShareAlt,
+} from 'react-icons/ai';
 
 const File = ({ file, deleteFunc }) => {
+  const shareClick = (handle) => {
+    Clipboardy.write('https://opacity.io/share#handle=' + handle);
+    Swal.fire('', 'Copied the link to your clipboard!', 'success');
+  };
+
   return (
     <tr>
       <td>
@@ -20,11 +31,16 @@ const File = ({ file, deleteFunc }) => {
       <td>
         <Moment format="MMM Do YYYY">{new Date(file.created)}</Moment>
       </td>
-      <td>{filesize(file.versions[0].size)}</td>
+      <td>{Filesize(file.versions[0].size)}</td>
       <td>
-        <Button onClick={() => deleteFunc(file.versions[0].handle)}>
-          <AiOutlineDelete></AiOutlineDelete>
-        </Button>
+        <ButtonGroup>
+          <Button onClick={() => shareClick(file.versions[0].handle)}>
+            <AiOutlineShareAlt></AiOutlineShareAlt>
+          </Button>
+          <Button onClick={() => deleteFunc(file.versions[0].handle)}>
+            <AiOutlineDelete></AiOutlineDelete>
+          </Button>
+        </ButtonGroup>
       </td>
     </tr>
   );

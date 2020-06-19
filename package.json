@@ -27,6 +27,7 @@
     "binary-file": "^0.2.3",
     "bip32": "^2.0.5",
     "bootstrap": "^4.5.0",
+    "clipboardy": "^2.3.0",
     "core-js": "^3.6.5",
     "eth-crypto": "^1.6.0",
     "filesize": "^6.1.0",

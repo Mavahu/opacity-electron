@@ -594,6 +594,24 @@ class OpacityAccount {
 
     return { hashedFolderKey: hashedFolderKey, keyString: keyString };
   }
+
+  async rename(folder, handle, newName) {
+    if (handle.length === 128) {
+      const metadata = await this.getFolderMetadata(folder);
+      let oldname = '';
+      for (const file of metadata.metadata.files) {
+        if (file.versions[0].handle === handle) {
+          oldname = file.name;
+          file.name = newName;
+          break;
+        }
+      }
+      await this._setMetadata(metadata);
+      console.log(`Successfully renamed ${oldname} into ${newName}`);
+    } else {
+      console.log('Folder renaming not implemented yet!');
+    }
+  }
 }
 
 module.exports = OpacityAccount;
