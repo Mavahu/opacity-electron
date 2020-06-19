@@ -13,6 +13,7 @@ const Constants = require('./models/Constants');
 const Helper = require('./Helper');
 const BinaryFile = require('binary-file');
 const Path = require('path');
+const Slash = require('slash');
 const Fs = require('fs');
 const Crypto = require('crypto');
 const FormData = require('form-data');
@@ -185,6 +186,29 @@ class OpacityAccount {
     );
   }
 
+  async upload(folder, fileOrFolderPath) {
+    let fileStats = Fs.lstatSync(fileOrFolderPath);
+    if (fileStats.isFile()) {
+      return await this.uploadFile(folder, fileOrFolderPath);
+    } else {
+      return await this.uploadFolder(folder, fileOrFolderPath);
+    }
+  }
+
+  async uploadFolder(folder, folderPath) {
+    const folderName = Path.basename(folderPath);
+    const finalPath = Slash(Path.join(folder, folderName));
+
+    const response = await this.createFolder(finalPath);
+
+    const files = Fs.readdirSync(folderPath);
+    for (let index = 0; index < files.length; index++) {
+      const toUpload = Path.join(folderPath, files[index]);
+      await this.upload(finalPath, toUpload);
+    }
+    return response;
+  }
+
   async uploadFile(folder, filePath) {
     const fileName = Path.basename(filePath);
     const stats = Fs.statSync(filePath);
@@ -241,9 +265,33 @@ class OpacityAccount {
       console.log(response);
     }
 
-    for (let i = 0; i < endIndex; i++) {
-      await this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex);
+    const promiseAmount = 7;
+    for (
+      let chunkIndex = 0;
+      chunkIndex < endIndex;
+      chunkIndex += promiseAmount
+    ) {
+      const promises = [];
+      Array(promiseAmount)
+        .fill()
+        .map((_, i) =>
+          i + chunkIndex < endIndex
+            ? promises.push(
+                this._uploadFilePart(
+                  fileData,
+                  fileMetaData,
+                  handle,
+                  i + chunkIndex,
+                  endIndex
+                )
+              )
+            : ''
+        );
+      await Promise.all(promises);
     }
+    // for (let i = 0; i < endIndex; i++) {
+    //   await this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex);
+    // }
 
     // Verify Upload & Retry missing parts
     requestBody = { fileHandle: fileId };

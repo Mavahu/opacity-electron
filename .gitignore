@@ -52,3 +52,10 @@ ehthumbs.db
 # Windows shortcuts #
 #####################
 *.lnk
+
+
+# Opacity-JS git #
+opacity/.gitignore
+opacity/README.md
+opacity/package-lock.json
+opacity/package.json
