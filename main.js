@@ -145,7 +145,7 @@ ipcMain.on('file:delete', async (e, file) => {
 ipcMain.on('files:upload', async (e, toUpload) => {
   console.log(toUpload);
   for (const file of toUpload.files) {
-    if (await account.uploadFile(toUpload.folder, file)) {
+    if (await account.upload(toUpload.folder, file)) {
       refreshFolder(toUpload.folder);
     }
   }
