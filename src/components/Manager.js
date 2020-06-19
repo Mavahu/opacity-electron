@@ -125,6 +125,32 @@ const Manager = () => {
     }
   }
 
+  async function renameFunc(handle, oldName) {
+    const { value: newName } = await Swal.fire({
+      title: 'Enter the a new name',
+      input: 'text',
+      inputValue: oldName,
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (value === oldName) {
+          return 'You need to set a new name!';
+        }
+        if (!value) {
+          return 'Specify a name!';
+        }
+      },
+    });
+
+    if (newName) {
+      Swal.fire('', '', 'success');
+      ipcRenderer.send('file:rename', {
+        folder: folderPath,
+        handle: handle,
+        newName: newName,
+      });
+    }
+  }
+
   return (
     <Container>
       <ButtonToolbar
@@ -174,7 +200,14 @@ const Manager = () => {
             );
           })}
           {metadata.files.map((file, index) => {
-            return <File key={index} file={file} deleteFunc={deleteFunc} />;
+            return (
+              <File
+                key={index}
+                file={file}
+                deleteFunc={deleteFunc}
+                renameFunc={renameFunc}
+              />
+            );
           })}
         </tbody>
       </Table>

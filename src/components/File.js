@@ -12,8 +12,9 @@ import {
   AiOutlineDelete,
   AiOutlineShareAlt,
 } from 'react-icons/ai';
+import { FiEdit } from 'react-icons/fi';
 
-const File = ({ file, deleteFunc }) => {
+const File = ({ file, deleteFunc, renameFunc }) => {
   const shareClick = (handle) => {
     Clipboardy.write('https://opacity.io/share#handle=' + handle);
     Swal.fire('', 'Copied the link to your clipboard!', 'success');
@@ -36,6 +37,11 @@ const File = ({ file, deleteFunc }) => {
         <ButtonGroup>
           <Button onClick={() => shareClick(file.versions[0].handle)}>
             <AiOutlineShareAlt></AiOutlineShareAlt>
+          </Button>
+          <Button
+            onClick={() => renameFunc(file.versions[0].handle, file.name)}
+          >
+            <FiEdit></FiEdit>
           </Button>
           <Button onClick={() => deleteFunc(file.versions[0].handle)}>
             <AiOutlineDelete></AiOutlineDelete>

@@ -152,13 +152,17 @@ ipcMain.on('files:upload', async (e, toUpload) => {
 });
 
 ipcMain.on('folder:create', async (e, newFolder) => {
-  console.log(newFolder);
   const folderPath = Slash(
     Path.join(newFolder.parentFolder, newFolder.folderName)
   );
   if (await account.createFolder(folderPath)) {
     refreshFolder(newFolder.parentFolder);
   }
+});
+
+ipcMain.on('file:rename', async (e, renameObj) => {
+  await account.rename(renameObj.folder, renameObj.handle, renameObj.newName);
+  refreshFolder(renameObj.folder);
 });
 
 async function refreshFolder(folder) {
