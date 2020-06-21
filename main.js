@@ -1,10 +1,12 @@
 const Path = require('path');
 const Slash = require('slash');
+let sleep = require('util').promisify(setTimeout);
 const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const { useHistory } = require('react-router-dom');
 const OpacityAccount = require('./opacity/OpacityAccount');
+const { toast } = require('react-toastify');
 
 let mainWindow;
 let account;
@@ -139,6 +141,7 @@ ipcMain.on('path:update', async (e, newPath) => {
 
 ipcMain.on('file:delete', async (e, file) => {
   await account.delete(file.folder, file.handle);
+  mainWindow.webContents.send(`delete:finished:${file.handle}`);
   refreshFolder(file.folder);
 });
 

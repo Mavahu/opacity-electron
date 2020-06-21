@@ -3,6 +3,7 @@ const { dialog } = require('electron').remote;
 import Path from 'path';
 import slash from 'slash';
 import React, { useState, useEffect } from 'react';
+import { ToastContainer } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
@@ -76,7 +77,7 @@ const Manager = () => {
     ipcRenderer.send('path:update', traversedPath);
   }
 
-  function deleteFunc(handle) {
+  function deleteFunc(handle, deleteToastId) {
     ipcRenderer.send('file:delete', {
       folder: folderPath,
       handle: handle,
@@ -211,6 +212,15 @@ const Manager = () => {
           })}
         </tbody>
       </Table>
+      <ToastContainer
+        position="bottom-right"
+        hideProgressBar={false}
+        autoClose={false}
+        newestOnTop={true}
+        closeOnClick={true}
+        draggable={false}
+        rtl={false}
+      />
     </Container>
   );
 };

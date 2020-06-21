@@ -4,6 +4,8 @@ import { HashRouter as Router, Route } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import Manager from './components/Manager';
 import 'bootstrap/dist/css/bootstrap.min.css';
+
+import 'react-toastify/dist/ReactToastify.css';
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 
