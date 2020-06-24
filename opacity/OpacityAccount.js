@@ -17,11 +17,13 @@ const Slash = require('slash');
 const Fs = require('fs');
 const Crypto = require('crypto');
 const FormData = require('form-data');
+const { EventEmitter } = require('events');
 
-class OpacityAccount {
+class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
 
   constructor(handle) {
+    super();
     this.handle = handle;
     this.privateKey = handle.slice(0, 64);
     this.chainCode = handle.slice(64, 128);
@@ -210,73 +212,74 @@ class OpacityAccount {
   }
 
   async uploadFile(folder, filePath) {
-    const fileName = Path.basename(filePath);
-    const stats = Fs.statSync(filePath);
-    const fileData = {
-      path: filePath,
-      name: fileName,
-      size: stats.size,
-      type: '',
-    };
+    try {
+      const fileName = Path.basename(filePath);
+      const stats = Fs.statSync(filePath);
+      const fileData = {
+        path: filePath,
+        name: fileName,
+        size: stats.size,
+        type: '',
+      };
 
-    const metadataToCheckIn = await this.getFolderMetadata(folder);
-    for (const file of metadataToCheckIn.metadata.files) {
-      if (file.name === fileData['name']) {
-        console.log(`File: ${fileData.name} already exists`);
-        return;
+      const metadataToCheckIn = await this.getFolderMetadata(folder);
+      for (const file of metadataToCheckIn.metadata.files) {
+        if (file.name === fileData['name']) {
+          console.log(`File: ${fileData.name} already exists`);
+          return;
+        }
       }
-    }
-    console.log(`Uploading file: ${fileData.name}`);
+      console.log(`Uploading file: ${fileData.name}`);
+      const fileMetaData = FileMetadata.toObject(fileData);
+      const uploadSize = Helper.getUploadSize(fileMetaData.size);
+      const endIndex = Helper.getEndIndex(uploadSize, fileMetaData.p);
 
-    const fileMetaData = FileMetadata.toObject(fileData);
-    const uploadSize = Helper.getUploadSize(fileMetaData.size);
-    const endIndex = Helper.getEndIndex(uploadSize, fileMetaData.p);
+      const handle = Crypto.randomBytes(64);
+      const keyBytes = handle.slice(32, 64);
 
-    const handle = Crypto.randomBytes(64);
-    const keyBytes = handle.slice(32, 64);
+      const fileMetadataJson = JSON.stringify(fileMetaData);
+      const encryptedFileMetadataJson = Helper.encrypt(
+        fileMetadataJson,
+        keyBytes
+      );
 
-    const fileMetadataJson = JSON.stringify(fileMetaData);
-    const encryptedFileMetadataJson = Helper.encrypt(
-      fileMetadataJson,
-      keyBytes
-    );
+      const handleHex = handle.toString('hex');
+      this.emit('upload:init', { handle: handleHex, fileName: fileData.name });
+      const fileId = handleHex.slice(0, 64);
 
-    const handleHex = handle.toString('hex');
-    const fileId = handleHex.slice(0, 64);
+      let requestBody = {
+        fileHandle: fileId,
+        fileSizeInByte: uploadSize,
+        endIndex: endIndex,
+      };
 
-    let requestBody = {
-      fileHandle: fileId,
-      fileSizeInByte: uploadSize,
-      endIndex: endIndex,
-    };
+      let requestBodyJson = JSON.stringify(requestBody);
 
-    let requestBodyJson = JSON.stringify(requestBody);
+      const form = this._signPayloadForm(requestBodyJson, {
+        metadata: encryptedFileMetadataJson,
+      });
 
-    const form = this._signPayloadForm(requestBodyJson, {
-      metadata: encryptedFileMetadataJson,
-    });
+      let response = await Axios.post(this.baseUrl + 'init-upload', form, {
+        headers: form.getHeaders(),
+      });
 
-    let response = await Axios.post(this.baseUrl + 'init-upload', form, {
-      headers: form.getHeaders(),
-    });
+      if (response.status !== 200) {
+        console.log('File initiation failed');
+        console.log(response);
+      }
 
-    if (response.status !== 200) {
-      console.log('File initiation failed');
-      console.log(response);
-    }
-
-    const promiseAmount = 7;
-    for (
-      let chunkIndex = 0;
-      chunkIndex < endIndex;
-      chunkIndex += promiseAmount
-    ) {
-      const promises = [];
-      Array(promiseAmount)
-        .fill()
-        .map((_, i) =>
-          i + chunkIndex < endIndex
-            ? promises.push(
+      const promiseAmount = 5;
+      for (
+        let chunkIndex = 0, uploadProgress = 0;
+        chunkIndex < endIndex;
+        chunkIndex += promiseAmount
+      ) {
+        const promises = [];
+        Array(promiseAmount)
+          .fill()
+          .map((_, i) => {
+            if (i + chunkIndex < endIndex) {
+              promises.push(
                 this._uploadFilePart(
                   fileData,
                   fileMetaData,
@@ -284,78 +287,85 @@ class OpacityAccount {
                   i + chunkIndex,
                   endIndex
                 )
-              )
-            : ''
+              );
+              uploadProgress++;
+            }
+          });
+        await Promise.all(promises);
+        this.emit(
+          `upload:progress:${handleHex}`,
+          Math.round((uploadProgress / endIndex + Number.EPSILON) * 100)
         );
-      await Promise.all(promises);
-    }
-    // for (let i = 0; i < endIndex; i++) {
-    //   await this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex);
-    // }
+      }
 
-    // Verify Upload & Retry missing parts
-    requestBody = { fileHandle: fileId };
-    requestBodyJson = JSON.stringify(requestBody);
-    const payload = this._signPayload(requestBodyJson);
-    const payloadJson = JSON.stringify(payload);
+      // Verify Upload & Retry missing parts
+      requestBody = { fileHandle: fileId };
+      requestBodyJson = JSON.stringify(requestBody);
+      const payload = this._signPayload(requestBodyJson);
+      const payloadJson = JSON.stringify(payload);
 
-    response = await Axios.post(this.baseUrl + 'upload-status', payloadJson);
+      response = await Axios.post(this.baseUrl + 'upload-status', payloadJson);
 
-    if (response.data.status === 'chunks missing') {
-      console.log('retrying upload');
-      const retries = 3;
-      for (let retry = 0; retry < retries; retry++) {
-        let missingParts = response.data.missingIndexes;
-        for (const missingPart of missingParts) {
-          console.log(
-            `Trying to re-upload part ${missingPart} of ${response.data.endIndex}`
-          );
-          await this._uploadFilePart(
-            fileData,
-            fileMetaData,
-            handle,
-            missingPart - 1,
-            endIndex
-          );
-        }
-        response = await Axios.post(
-          this.baseUrl + 'upload-status',
-          payloadJson
-        );
-        if (response.data.status === 'File is uploaded') {
-          break;
-        } else {
-          if (retry === 2) {
+      if (response.data.status === 'chunks missing') {
+        console.log('retrying upload');
+        const retries = 3;
+        for (let retry = 0; retry < retries; retry++) {
+          let missingParts = response.data.missingIndexes;
+          for (const missingPart of missingParts) {
             console.log(
-              `Failed to upload the ${fileData.name}\nReason: Too many retries`
+              `Trying to re-upload part ${missingPart} of ${response.data.endIndex}`
             );
-            return;
+            await this._uploadFilePart(
+              fileData,
+              fileMetaData,
+              handle,
+              missingPart - 1,
+              endIndex
+            );
+          }
+          response = await Axios.post(
+            this.baseUrl + 'upload-status',
+            payloadJson
+          );
+          if (response.data.status === 'File is uploaded') {
+            break;
+          } else {
+            if (retry === 2) {
+              console.log(
+                `Failed to upload the ${fileData.name}\nReason: Too many retries`
+              );
+              return;
+            }
           }
         }
       }
+
+      // Add file to the Metadata
+
+      const fileInfo = new FolderMetadataFile(
+        fileData.name,
+        Math.floor(stats.ctimeMs),
+        Math.floor(stats.mtimeMs)
+      );
+      fileInfo.versions.push(
+        new FolderMetadataFileVersion(
+          handleHex,
+          fileData.size,
+          fileInfo.modified,
+          fileInfo.created
+        )
+      );
+
+      const metadata = await this.getFolderMetadata(folder);
+      metadata.metadata.files.push(fileInfo);
+      await this._setMetadata(metadata);
+      console.log(`Uploaded file: ${fileData.name}`);
+      this.emit(`upload:finished:${handleHex}`);
+      return true;
+    } catch (e) {
+      console.log(e);
+      this.emit(`upload:failed:${handleHex}`);
     }
-
-    // Add file to the Metadata
-
-    const fileInfo = new FolderMetadataFile(
-      fileData.name,
-      Math.floor(stats.ctimeMs),
-      Math.floor(stats.mtimeMs)
-    );
-    fileInfo.versions.push(
-      new FolderMetadataFileVersion(
-        handleHex,
-        fileData.size,
-        fileInfo.modified,
-        fileInfo.created
-      )
-    );
-
-    const metadata = await this.getFolderMetadata(folder);
-    metadata.metadata.files.push(fileInfo);
-    await this._setMetadata(metadata);
-    console.log(`Uploaded file: ${fileData.name}`);
-    return true;
   }
 
   async _uploadFilePart(

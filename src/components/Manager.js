@@ -2,8 +2,8 @@ import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
 import slash from 'slash';
-import React, { useState, useEffect } from 'react';
-import { ToastContainer } from 'react-toastify';
+import React, { useState, useEffect, useRef } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
@@ -21,8 +21,9 @@ import FormControl from 'react-bootstrap/FormControl';
 import Swal from 'sweetalert2';
 
 const Manager = () => {
-  const [files, setFiles] = useState([]);
   const [folderPath, setFolderPath] = useState('/');
+  const refFolderPath = useRef(folderPath);
+  refFolderPath.current = folderPath;
   const [folders, setFolders] = useState(['All Files']);
   const [metadata, setMetadata] = useState({
     name: 'Folder',
@@ -52,15 +53,43 @@ const Manager = () => {
   });
 
   useEffect(() => {
-    ipcRenderer.on('files:get', (e, newMetadata) => {
-      setMetadata(newMetadata);
+    ipcRenderer.on('metadata:set', (e, newMetadata) => {
+      if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
+        setMetadata(newMetadata.metadata);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    ipcRenderer.on('toast:create', (e, data) =>
+      toast(`${data.fileName}\n is uploading. Please wait...`, {
+        toastId: data.toastId,
+        autoClose: false,
+      })
+    );
+
+    ipcRenderer.on('toast:update', (e, data) => {
+      toast.update(data.toastId, {
+        render: `${data.fileName} progress: ${data.percentage}%`,
+        progress: data.percentage / 100.0,
+      });
+    });
+
+    ipcRenderer.on('toast:finished', (e, data) => {
+      toast.update(data.toastId, {
+        render: `${data.fileName} has finished uploading.`,
+        progress: 1,
+      });
+      setTimeout(() => {
+        toast.dismiss(data.toastId);
+      }, 3000);
     });
   }, []);
 
   function updatePath(newPath) {
     const updatedPath = slash(Path.join(folderPath, newPath));
-    ipcRenderer.send('path:update', updatedPath);
     setFolderPath(updatedPath);
+    ipcRenderer.send('path:update', updatedPath);
     setFolders([...folders, newPath]);
   }
 
@@ -77,10 +106,18 @@ const Manager = () => {
     ipcRenderer.send('path:update', traversedPath);
   }
 
-  function deleteFunc(handle, deleteToastId) {
+  function deleteFunc(handle, toDelete) {
     ipcRenderer.send('file:delete', {
       folder: folderPath,
       handle: handle,
+    });
+    ipcRenderer.once(`file:deleted:${handle}`, () => {
+      toast.update(handle, {
+        render: `${toDelete} deleted.`,
+      });
+      setTimeout(() => {
+        toast.dismiss(handle);
+      }, 3000);
     });
   }
 

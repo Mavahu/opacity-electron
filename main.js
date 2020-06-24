@@ -3,7 +3,7 @@ const Slash = require('slash');
 let sleep = require('util').promisify(setTimeout);
 const url = require('url');
 const keytar = require('keytar');
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, webContents } = require('electron');
 const { useHistory } = require('react-router-dom');
 const OpacityAccount = require('./opacity/OpacityAccount');
 const { toast } = require('react-toastify');
@@ -136,21 +136,49 @@ ipcMain.on('handle:set', async (e, handleObject) => {
 });
 
 ipcMain.on('path:update', async (e, newPath) => {
-  refreshFolder(newPath);
+  refreshFolder(newPath, true);
 });
 
 ipcMain.on('file:delete', async (e, file) => {
   await account.delete(file.folder, file.handle);
-  mainWindow.webContents.send(`delete:finished:${file.handle}`);
+  mainWindow.webContents.send(`file:deleted:${file.handle}`);
   refreshFolder(file.folder);
 });
 
 ipcMain.on('files:upload', async (e, toUpload) => {
-  console.log(toUpload);
   for (const file of toUpload.files) {
-    if (await account.upload(toUpload.folder, file)) {
-      refreshFolder(toUpload.folder);
-    }
+    account.on(`upload:init`, (file) => {
+      console.log('hallo');
+      console.log(file);
+      mainWindow.webContents.send('toast:create', {
+        toastId: file.handle,
+        fileName: file.fileName,
+      });
+
+      account.on(`upload:progress:${file.handle}`, (percentage) =>
+        mainWindow.webContents.send('toast:update', {
+          fileName: file.fileName,
+          toastId: file.handle,
+          percentage: percentage,
+        })
+      );
+
+      account.on(`upload:finished:${file.handle}`, () => {
+        mainWindow.webContents.send('toast:finished', {
+          fileName: file.fileName,
+          toastId: file.handle,
+        });
+        account.removeAllListeners(`upload:progress:${file.handle}`);
+        account.removeAllListeners(`upload:finished:${file.handle}`);
+        account.removeAllListeners(`upload:init`);
+      });
+    });
+
+    await account.upload(toUpload.folder, file).then((response) => {
+      if (response) {
+        refreshFolder(toUpload.folder);
+      }
+    });
   }
 });
 
@@ -168,9 +196,13 @@ ipcMain.on('file:rename', async (e, renameObj) => {
   refreshFolder(renameObj.folder);
 });
 
-async function refreshFolder(folder) {
-  const files = (await account.getFolderMetadata(folder)).metadata;
-  mainWindow.webContents.send('files:get', files);
+async function refreshFolder(folder, force = false) {
+  const metadata = (await account.getFolderMetadata(folder)).metadata;
+  mainWindow.webContents.send('metadata:set', {
+    metadata: metadata,
+    folder: folder,
+    force: force,
+  });
 }
 
 app.on('window-all-closed', () => {

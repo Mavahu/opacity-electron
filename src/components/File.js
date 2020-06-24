@@ -22,19 +22,11 @@ const File = ({ file, deleteFunc, renameFunc }) => {
 
   const deleteToast = () => {
     deleteToastId.current = toast(`Deleting ${file.name}`, {
+      toastId: file.versions[0].handle,
       autoClose: false,
     });
 
-    deleteFunc(file.versions[0].handle);
-
-    ipcRenderer.once(`delete:finished:${file.versions[0].handle}`, () => {
-      toast.update(deleteToastId.current, {
-        render: `Deleted ${file.name}`,
-        type: toast.TYPE.INFO,
-        autoClose: 2000,
-        closeButton: null, // The closeButton defined on ToastContainer will be used
-      });
-    });
+    deleteFunc(file.versions[0].handle, file.name);
   };
 
   const shareClick = (handle) => {
