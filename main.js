@@ -153,6 +153,12 @@ ipcMain.on('files:upload', async (e, toUpload) => {
   }
 });
 
+ipcMain.on('files:download', async (e, toDownload) => {
+  for (const file of toDownload.files) {
+    await account.download(toDownload.folder, file, toDownload.savingPath);
+  }
+});
+
 ipcMain.on('folder:create', async (e, newFolder) => {
   const folderPath = Slash(
     Path.join(newFolder.parentFolder, newFolder.folderName)

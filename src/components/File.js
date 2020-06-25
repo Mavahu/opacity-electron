@@ -10,13 +10,14 @@ import Swal from 'sweetalert2';
 const Clipboardy = require('clipboardy');
 import {
   AiOutlineFile,
+  AiOutlineDownload,
   AiOutlineDelete,
   AiOutlineShareAlt,
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
 import { ipcRenderer } from 'electron';
 
-const File = ({ file, deleteFunc, renameFunc }) => {
+const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
   const toastId = React.useRef(null);
   const deleteToastId = React.useRef(null);
 
@@ -51,6 +52,13 @@ const File = ({ file, deleteFunc, renameFunc }) => {
         <ButtonGroup>
           <Button onClick={() => shareClick(file.versions[0].handle)}>
             <AiOutlineShareAlt></AiOutlineShareAlt>
+          </Button>
+          <Button
+            onClick={() =>
+              downloadFunc({ handle: file.versions[0].handle, name: file.name })
+            }
+          >
+            <AiOutlineDownload />
           </Button>
           <Button
             onClick={() => renameFunc(file.versions[0].handle, file.name)}

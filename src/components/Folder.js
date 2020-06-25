@@ -1,12 +1,15 @@
 import React from 'react';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import Badge from 'react-bootstrap/Badge';
-import { AiOutlineFile } from 'react-icons/ai';
-import { AiFillFolder } from 'react-icons/ai';
 import { ipcRenderer } from 'electron';
+import {
+  AiFillFolder,
+  AiOutlineDownload,
+  AiOutlineDelete,
+  AiOutlineShareAlt,
+} from 'react-icons/ai';
 
-const Folder = ({ folder, updatePath }) => {
+const Folder = ({ folder, updatePath, downloadFunc }) => {
   return (
     <tr>
       <td>
@@ -22,7 +25,15 @@ const Folder = ({ folder, updatePath }) => {
       </td>
       <td></td>
       <td></td>
-      <td>x</td>
+      <td>
+        <Button
+          onClick={() =>
+            downloadFunc({ handle: folder.handle, name: folder.name })
+          }
+        >
+          <AiOutlineDownload />
+        </Button>
+      </td>
     </tr>
   );
 };

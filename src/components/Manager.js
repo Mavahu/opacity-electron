@@ -131,9 +131,29 @@ const Manager = () => {
       })
       .then((result) => {
         if (!result.canceled) {
+          console.log(folderPath);
           ipcRenderer.send('files:upload', {
             folder: folderPath,
             files: result.filePaths,
+          });
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  }
+
+  async function downloadFunc(item) {
+    dialog
+      .showOpenDialog({
+        properties: ['openDirectory'],
+      })
+      .then((result) => {
+        if (!result.canceled) {
+          ipcRenderer.send('files:download', {
+            folder: folderPath,
+            files: [item],
+            savingPath: result.filePaths[0],
           });
         }
       })
@@ -234,7 +254,12 @@ const Manager = () => {
         <tbody>
           {metadata.folders.map((folder, index) => {
             return (
-              <Folder key={index} folder={folder} updatePath={updatePath} />
+              <Folder
+                key={index}
+                folder={folder}
+                updatePath={updatePath}
+                downloadFunc={downloadFunc}
+              />
             );
           })}
           {metadata.files.map((file, index) => {
@@ -243,6 +268,7 @@ const Manager = () => {
                 key={index}
                 file={file}
                 deleteFunc={deleteFunc}
+                downloadFunc={downloadFunc}
                 renameFunc={renameFunc}
               />
             );
