@@ -424,7 +424,11 @@ class OpacityAccount extends EventEmitter {
     if (fileOrFolder.handle.length === 128) {
       return await this._downloadFile(fileOrFolder.handle, savingPath);
     } else {
-      return await this._downloadFolder(opacityFolder, fileOrFolder.name, savingPath);
+      return await this._downloadFolder(
+        opacityFolder,
+        fileOrFolder.name,
+        savingPath
+      );
     }
   }
 
@@ -446,6 +450,11 @@ class OpacityAccount extends EventEmitter {
     const decryptedMetadata = Helper.decrypt(encryptedMetadata, fileKey);
     const decryptedMetadataJson = JSON.parse(decryptedMetadata);
     const fileMetaoptions = FileMetadata.toObject(decryptedMetadataJson);
+
+    this.emit('download:init', {
+      handle: handle,
+      fileName: fileMetaoptions.name,
+    });
 
     const uploadSize = Helper.getUploadSize(fileMetaoptions.size);
     const partSize = 5245440; // 80 * (Constants.DEFAULT_BLOCK_SIZE + Constants.BLOCK_OVERHEAD)
@@ -473,9 +482,17 @@ class OpacityAccount extends EventEmitter {
         fileDownloadUrl,
         folderPath
       );
+
+      this.emit(
+        `download:progress:${handle}`,
+        part + 1 !== parts
+          ? Math.round(((part + 1) / parts + Number.EPSILON) * 100)
+          : 99
+      );
     }
 
     // Reconstruct file out of the parts
+    console.log('Reconstructing');
     const chunkSize = fileMetaoptions.p.blockSize + Constants.BLOCK_OVERHEAD;
     const chunksAmount = Math.floor(uploadSize / chunkSize) + 1;
 
@@ -486,28 +503,31 @@ class OpacityAccount extends EventEmitter {
     }
 
     let fileIndex = 0;
-    let seek = 0,oldSeek = 0;
+    let seek = 0,
+      oldSeek = 0,
+      totalSeek = 0;
     for (let chunkIndex = 0; chunkIndex < chunksAmount; chunkIndex++) {
       let chunkRawBytes;
       let toReadBytes = chunkSize;
       const partPath = Path.join(folderPath, fileIndex + '.part');
+      const myBinaryFile = new BinaryFile(partPath, 'r');
+      myBinaryFile.seek(seek);
       if (seek + toReadBytes >= Fs.statSync(partPath).size) {
         toReadBytes = Fs.statSync(partPath).size - seek;
         seek = 0;
         fileIndex++;
+      } else {
+        seek += chunkSize;
       }
-      const myBinaryFile = new BinaryFile(partPath, 'r');
       try {
         await myBinaryFile.open();
-        chunkRawBytes = await myBinaryFile.read(toReadBytes, oldSeek);
+        chunkRawBytes = await myBinaryFile.read(toReadBytes);
         await myBinaryFile.close();
       } catch (e) {
         console.log(e);
       }
       const decryptedChunk = Helper.decryptFileChunk(chunkRawBytes, fileKey);
       Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
-      seek += chunkSize;
-      oldSeek = seek;
     }
 
     Fs.rmdirSync(folderPath, { recursive: true });
@@ -517,6 +537,7 @@ class OpacityAccount extends EventEmitter {
       Fs.rmdirSync(tempFolderPath);
     }
 
+    this.emit(`download:finished:${handle}`);
     console.log(`Finished download of ${fileMetaoptions.name}`);
   }
 
@@ -534,40 +555,34 @@ class OpacityAccount extends EventEmitter {
     if (byteTo > uploadSize - 1) {
       byteTo = uploadSize - 1;
     }
-    const range = { range: `bytes=${byteFrom}-${byteTo}` };
+    const range = `bytes=${byteFrom}-${byteTo}`;
     const response = await Axios.get(fileDownloadUrl, {
       responseType: 'arraybuffer',
       headers: { range },
     });
-
     const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
     Fs.writeFileSync(fileToWriteTo, response.data);
   }
 
   async _downloadFolder(opacityFolder, folderToDownload, savingPath) {
-
-    const newFolderPath = Path.join(savingPath, folderToDownload)
+    const newFolderPath = Path.join(savingPath, folderToDownload);
 
     if (!Fs.existsSync(newFolderPath)) {
       Fs.mkdirSync(newFolderPath, { recursive: true });
-      console.log("Created Folder!")
-    } else{
-      console.log("Folder exists already");
+      console.log('Created Folder!');
+    } else {
+      console.log('Folder exists already');
     }
 
     const opacityPath = Slash(Path.join(opacityFolder, folderToDownload));
     const newMetadata = (await this.getFolderMetadata(opacityPath)).metadata;
 
-    for (const folder of newMetadata.folders){
-      await this._downloadFolder(
-          opacityPath,
-          folder.name,
-          newFolderPath
-      )
+    for (const folder of newMetadata.folders) {
+      await this._downloadFolder(opacityPath, folder.name, newFolderPath);
     }
 
-    for (const file of newMetadata.files){
-      await this._downloadFile(file.versions[0].handle, newFolderPath)
+    for (const file of newMetadata.files) {
+      await this._downloadFile(file.versions[0].handle, newFolderPath);
     }
   }
 

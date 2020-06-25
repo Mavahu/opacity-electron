@@ -180,13 +180,13 @@ async function setAccount(handle) {
   // set up listeners
   account.on(`upload:init`, (file) => {
     mainWindow.webContents.send('toast:create', {
+      text: `${file.fileName} is uploading. Please wait...`,
       toastId: file.handle,
-      fileName: file.fileName,
     });
 
     account.on(`upload:progress:${file.handle}`, (percentage) =>
       mainWindow.webContents.send('toast:update', {
-        fileName: file.fileName,
+        text: `${file.fileName} upload progress: ${percentage}%`,
         toastId: file.handle,
         percentage: percentage,
       })
@@ -194,7 +194,31 @@ async function setAccount(handle) {
 
     account.on(`upload:finished:${file.handle}`, () => {
       mainWindow.webContents.send('toast:finished', {
-        fileName: file.fileName,
+        text: `${file.fileName} has finished uploading.`,
+        toastId: file.handle,
+      });
+      account.removeAllListeners(`upload:progress:${file.handle}`);
+      account.removeAllListeners(`upload:finished:${file.handle}`);
+    });
+  });
+
+  account.on(`download:init`, (file) => {
+    mainWindow.webContents.send('toast:create', {
+      text: `${file.fileName} is downloading. Please wait...`,
+      toastId: file.handle,
+    });
+
+    account.on(`download:progress:${file.handle}`, (percentage) =>
+      mainWindow.webContents.send('toast:update', {
+        text: `${file.fileName} download progress: ${percentage}%`,
+        toastId: file.handle,
+        percentage: percentage,
+      })
+    );
+
+    account.on(`download:finished:${file.handle}`, () => {
+      mainWindow.webContents.send('toast:finished', {
+        text: `${file.fileName} has finished downloading.`,
         toastId: file.handle,
       });
       account.removeAllListeners(`upload:progress:${file.handle}`);

@@ -62,7 +62,7 @@ const Manager = () => {
 
   useEffect(() => {
     ipcRenderer.on('toast:create', (e, data) =>
-      toast(`${data.fileName}\n is uploading. Please wait...`, {
+      toast(data.text, {
         toastId: data.toastId,
         autoClose: false,
       })
@@ -70,14 +70,14 @@ const Manager = () => {
 
     ipcRenderer.on('toast:update', (e, data) => {
       toast.update(data.toastId, {
-        render: `${data.fileName} progress: ${data.percentage}%`,
+        render: data.text,
         progress: data.percentage / 100.0,
       });
     });
 
     ipcRenderer.on('toast:finished', (e, data) => {
       toast.update(data.toastId, {
-        render: `${data.fileName} has finished uploading.`,
+        render: data.text,
         progress: 1,
       });
       setTimeout(() => {
