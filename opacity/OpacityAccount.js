@@ -503,14 +503,13 @@ class OpacityAccount extends EventEmitter {
     }
 
     let fileIndex = 0;
-    let seek = 0,
-      oldSeek = 0,
-      totalSeek = 0;
+    let seek = 0;
+    let partPath = Path.join(folderPath, fileIndex + '.part');
+    let myBinaryFile = new BinaryFile(partPath, 'r');
+    await myBinaryFile.open();
     for (let chunkIndex = 0; chunkIndex < chunksAmount; chunkIndex++) {
       let chunkRawBytes;
       let toReadBytes = chunkSize;
-      const partPath = Path.join(folderPath, fileIndex + '.part');
-      const myBinaryFile = new BinaryFile(partPath, 'r');
       myBinaryFile.seek(seek);
       if (seek + toReadBytes >= Fs.statSync(partPath).size) {
         toReadBytes = Fs.statSync(partPath).size - seek;
@@ -520,15 +519,22 @@ class OpacityAccount extends EventEmitter {
         seek += chunkSize;
       }
       try {
-        await myBinaryFile.open();
         chunkRawBytes = await myBinaryFile.read(toReadBytes);
-        await myBinaryFile.close();
       } catch (e) {
         console.log(e);
       }
       const decryptedChunk = Helper.decryptFileChunk(chunkRawBytes, fileKey);
       Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
+
+      if(seek === 0 && chunkIndex + 1 !== chunksAmount){
+        await myBinaryFile.close();
+        partPath = Path.join(folderPath, fileIndex + '.part');
+        myBinaryFile = new BinaryFile(partPath, 'r');
+        await myBinaryFile.open();
+      }
     }
+
+    await myBinaryFile.close();
 
     Fs.rmdirSync(folderPath, { recursive: true });
     const tempFolderPath = Path.dirname(folderPath);
