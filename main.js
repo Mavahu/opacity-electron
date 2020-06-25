@@ -112,16 +112,14 @@ ipcMain.on('login:restore', async (e) => {
   password = await keytar.getPassword('Opacity', 'Handle');
   if (password) {
     mainWindow.webContents.send('login:success');
-    account = new OpacityAccount(password);
-    await account.checkAccountStatus();
+    await setAccount(password);
     refreshFolder('/');
   }
 });
 
 ipcMain.on('handle:set', async (e, handleObject) => {
   try {
-    account = new OpacityAccount(handleObject.handle);
-    await account.checkAccountStatus();
+    await setAccount(handleObject.handle);
 
     if (handleObject.saveHandle) {
       // save handle to keyring
@@ -147,33 +145,6 @@ ipcMain.on('file:delete', async (e, file) => {
 
 ipcMain.on('files:upload', async (e, toUpload) => {
   for (const file of toUpload.files) {
-    account.on(`upload:init`, (file) => {
-      console.log('hallo');
-      console.log(file);
-      mainWindow.webContents.send('toast:create', {
-        toastId: file.handle,
-        fileName: file.fileName,
-      });
-
-      account.on(`upload:progress:${file.handle}`, (percentage) =>
-        mainWindow.webContents.send('toast:update', {
-          fileName: file.fileName,
-          toastId: file.handle,
-          percentage: percentage,
-        })
-      );
-
-      account.on(`upload:finished:${file.handle}`, () => {
-        mainWindow.webContents.send('toast:finished', {
-          fileName: file.fileName,
-          toastId: file.handle,
-        });
-        account.removeAllListeners(`upload:progress:${file.handle}`);
-        account.removeAllListeners(`upload:finished:${file.handle}`);
-        account.removeAllListeners(`upload:init`);
-      });
-    });
-
     await account.upload(toUpload.folder, file).then((response) => {
       if (response) {
         refreshFolder(toUpload.folder);
@@ -195,6 +166,36 @@ ipcMain.on('file:rename', async (e, renameObj) => {
   await account.rename(renameObj.folder, renameObj.handle, renameObj.newName);
   refreshFolder(renameObj.folder);
 });
+
+async function setAccount(handle) {
+  account = new OpacityAccount(handle);
+  await account.checkAccountStatus();
+
+  // set up listeners
+  account.on(`upload:init`, (file) => {
+    mainWindow.webContents.send('toast:create', {
+      toastId: file.handle,
+      fileName: file.fileName,
+    });
+
+    account.on(`upload:progress:${file.handle}`, (percentage) =>
+      mainWindow.webContents.send('toast:update', {
+        fileName: file.fileName,
+        toastId: file.handle,
+        percentage: percentage,
+      })
+    );
+
+    account.on(`upload:finished:${file.handle}`, () => {
+      mainWindow.webContents.send('toast:finished', {
+        fileName: file.fileName,
+        toastId: file.handle,
+      });
+      account.removeAllListeners(`upload:progress:${file.handle}`);
+      account.removeAllListeners(`upload:finished:${file.handle}`);
+    });
+  });
+}
 
 async function refreshFolder(folder, force = false) {
   const metadata = (await account.getFolderMetadata(folder)).metadata;

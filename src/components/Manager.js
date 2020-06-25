@@ -251,6 +251,7 @@ const Manager = () => {
       </Table>
       <ToastContainer
         position="bottom-right"
+        limit={7}
         hideProgressBar={false}
         autoClose={false}
         newestOnTop={true}
