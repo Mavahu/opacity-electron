@@ -25,37 +25,35 @@ const Manager = () => {
   const refFolderPath = useRef(folderPath);
   refFolderPath.current = folderPath;
   const [folders, setFolders] = useState(['All Files']);
-  const [metadata, setMetadata] = useState({
-    name: 'Folder',
-    files: [
-      {
-        name: 'UAM Vergütungsvereinbarung.pdf',
-        created: 1565178217971,
-        modified: 1565178217971,
-        versions: [
-          {
-            handle:
-              '1a9c0c94e4a05c16581c29d3241d8680a7467339c309df7387ab6a264427915ccf84c0dea20ff23bdcd04cdafa29d0d7abca336cd1f2a0098da801c45d172837',
-            size: 3573288,
-            modified: 1565178217971,
-            created: 1565176690097,
-          },
-        ],
-      },
-    ],
-    folders: [
-      {
-        name: 'Game of Thrones',
-        handle:
-          'b4390daf1d0c71298c0ffda0750a865fbaa72dd7cce07e2b8f5fed7ef983fb90',
-      },
-    ],
-  });
+  const [metadata, setMetadata] = useState(false);
+  const defaultSorts = {
+    name: {
+      show: false,
+      ascending: true,
+      icon: '',
+    },
+    size: {
+      show: false,
+      ascending: true,
+      icon: '',
+    },
+    createdDate: {
+      show: false,
+      ascending: true,
+      icon: '',
+    },
+    icons: {
+      down: '▼',
+      up: '▲',
+    },
+  };
+  const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
       if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
         setMetadata(newMetadata.metadata);
+        setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
     });
   }, []);
@@ -78,7 +76,6 @@ const Manager = () => {
     ipcRenderer.on('toast:finished', (e, data) => {
       toast.update(data.toastId, {
         render: data.text,
-        progress: 1,
       });
       setTimeout(() => {
         toast.dismiss(data.toastId);
@@ -94,9 +91,6 @@ const Manager = () => {
   }
 
   function goBackTo(buttonIndex) {
-    /*if (folders[folders.length - 1] == goToPath) {
-      return;
-    }*/
     const newPath = folders.slice(0, buttonIndex + 1);
     setFolders(newPath);
     let traversedPath = [...newPath];
@@ -131,7 +125,6 @@ const Manager = () => {
       })
       .then((result) => {
         if (!result.canceled) {
-          console.log(folderPath);
           ipcRenderer.send('files:upload', {
             folder: folderPath,
             files: result.filePaths,
@@ -209,6 +202,68 @@ const Manager = () => {
     }
   }
 
+  async function sortName() {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+
+    copyMetadata.folders.sort(function (folderA, folderB) {
+      return sorts.name.ascending
+        ? ('' + folderA.name).localeCompare(folderB.name)
+        : ('' + folderB.name).localeCompare(folderA.name);
+    });
+
+    copyMetadata.files.sort(function (fileA, fileB) {
+      return sorts.name.ascending
+        ? ('' + fileA.name).localeCompare(fileB.name)
+        : ('' + fileB.name).localeCompare(fileA.name);
+    });
+
+    sorts.name.ascending = !sorts.name.ascending;
+    sorts.name.show = true;
+    sorts.name.icon = sorts.name.ascending ? sorts.icons.down : sorts.icons.up;
+    sorts.size = defaultSorts.size;
+    sorts.createdDate = defaultSorts.createdDate;
+    setSorts(sorts);
+    setMetadata(copyMetadata);
+  }
+
+  async function sortSize() {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+
+    copyMetadata.files.sort(function (fileA, fileB) {
+      return sorts.size.ascending
+        ? fileA.versions[0].size - fileB.versions[0].size
+        : fileB.versions[0].size - fileA.versions[0].size;
+    });
+
+    sorts.size.ascending = !sorts.size.ascending;
+    sorts.size.show = true;
+    sorts.size.icon = sorts.size.ascending ? sorts.icons.down : sorts.icons.up;
+    sorts.name = defaultSorts.name;
+    sorts.createdDate = defaultSorts.createdDate;
+    setSorts(sorts);
+    setMetadata(copyMetadata);
+  }
+
+  async function sortCreated() {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+
+    copyMetadata.files.sort(function (fileA, fileB) {
+      return sorts.createdDate.ascending
+        ? fileA.created - fileB.created
+        : fileB.created - fileA.created;
+    });
+
+    sorts.createdDate.ascending = !sorts.createdDate.ascending;
+    sorts.createdDate.show = true;
+    sorts.createdDate.icon = sorts.createdDate.ascending
+      ? sorts.icons.down
+      : sorts.icons.up;
+    sorts.name = defaultSorts.name;
+    sorts.size = defaultSorts.size;
+    setSorts(sorts);
+    setMetadata(copyMetadata);
+  }
+
   return (
     <Container>
       <ButtonToolbar
@@ -240,39 +295,57 @@ const Manager = () => {
           </Card>
         </ButtonGroup>
       </ButtonToolbar>
-      <Table>
+      <Table size="sm">
         <thead>
           <tr>
             <th></th>
             <th></th>
-            <th>Name</th>
-            <th>Created</th>
-            <th>Size</th>
+            <th>
+              <Button variant="outline-secondary" onClick={sortName}>
+                Name
+                {sorts.name.show ? ' ' + sorts.name.icon : ''}
+              </Button>
+            </th>
+            <th>
+              {' '}
+              <Button variant="outline-secondary" onClick={sortCreated}>
+                Created
+                {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
+              </Button>
+            </th>
+            <th>
+              <Button variant="outline-secondary" onClick={sortSize}>
+                Size
+                {sorts.size.show ? ' ' + sorts.size.icon : ''}
+              </Button>
+            </th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {metadata.folders.map((folder, index) => {
-            return (
-              <Folder
-                key={index}
-                folder={folder}
-                updatePath={updatePath}
-                downloadFunc={downloadFunc}
-              />
-            );
-          })}
-          {metadata.files.map((file, index) => {
-            return (
-              <File
-                key={index}
-                file={file}
-                deleteFunc={deleteFunc}
-                downloadFunc={downloadFunc}
-                renameFunc={renameFunc}
-              />
-            );
-          })}
+          {metadata &&
+            metadata.folders.map((folder, index) => {
+              return (
+                <Folder
+                  key={index}
+                  folder={folder}
+                  updatePath={updatePath}
+                  downloadFunc={downloadFunc}
+                />
+              );
+            })}
+          {metadata &&
+            metadata.files.map((file, index) => {
+              return (
+                <File
+                  key={index}
+                  file={file}
+                  deleteFunc={deleteFunc}
+                  downloadFunc={downloadFunc}
+                  renameFunc={renameFunc}
+                />
+              );
+            })}
         </tbody>
       </Table>
       <ToastContainer

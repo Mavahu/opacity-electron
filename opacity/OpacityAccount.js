@@ -294,7 +294,9 @@ class OpacityAccount extends EventEmitter {
         await Promise.all(promises);
         this.emit(
           `upload:progress:${handleHex}`,
-          Math.round((uploadProgress / endIndex + Number.EPSILON) * 100)
+          uploadProgress !== endIndex
+            ? Math.round((uploadProgress / endIndex) * 100)
+            : 99.9
         );
       }
 
@@ -474,7 +476,7 @@ class OpacityAccount extends EventEmitter {
     const fileDownloadUrl = downloadUrl + '/file';
 
     const promiseAmount = 5;
-    for (let part = 0; part < parts; part += promiseAmount) {
+    for (let part = 0, partProgress = 0; part < parts; part += promiseAmount) {
       const promises = [];
       Array(promiseAmount)
         .fill()
@@ -490,14 +492,13 @@ class OpacityAccount extends EventEmitter {
                 folderPath
               )
             );
+            partProgress++;
           }
         });
       await Promise.all(promises);
       this.emit(
         `download:progress:${handle}`,
-        part + 1 !== parts
-          ? Math.round(((part + 1) / parts + Number.EPSILON) * 100)
-          : 99
+        partProgress !== parts ? Math.round((partProgress / parts) * 100) : 99.9
       );
     }
 

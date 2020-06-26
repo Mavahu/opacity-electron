@@ -5,7 +5,6 @@ import Filesize from 'filesize';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
-import Badge from 'react-bootstrap/Badge';
 import Swal from 'sweetalert2';
 const Clipboardy = require('clipboardy');
 import {
@@ -15,7 +14,6 @@ import {
   AiOutlineShareAlt,
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
-import { ipcRenderer } from 'electron';
 
 const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
   const toastId = React.useRef(null);
