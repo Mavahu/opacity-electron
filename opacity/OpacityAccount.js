@@ -473,16 +473,26 @@ class OpacityAccount extends EventEmitter {
     console.log(`Downloading file: ${fileMetaoptions.name}`);
     const fileDownloadUrl = downloadUrl + '/file';
 
-    for (let part = 0; part < parts; part++) {
-      await this._downloadPart(
-        part,
-        parts,
-        partSize,
-        uploadSize,
-        fileDownloadUrl,
-        folderPath
-      );
-
+    const promiseAmount = 5;
+    for (let part = 0; part < parts; part += promiseAmount) {
+      const promises = [];
+      Array(promiseAmount)
+        .fill()
+        .map((_, i) => {
+          if (i + part < parts) {
+            promises.push(
+              this._downloadPart(
+                part + i,
+                parts,
+                partSize,
+                uploadSize,
+                fileDownloadUrl,
+                folderPath
+              )
+            );
+          }
+        });
+      await Promise.all(promises);
       this.emit(
         `download:progress:${handle}`,
         part + 1 !== parts
@@ -490,6 +500,13 @@ class OpacityAccount extends EventEmitter {
           : 99
       );
     }
+
+    /*this.emit(
+        `download:progress:${handle}`,
+        part + 1 !== parts
+          ? Math.round(((part + 1) / parts + Number.EPSILON) * 100)
+          : 99
+      );*/
 
     // Reconstruct file out of the parts
     console.log('Reconstructing');
@@ -502,6 +519,7 @@ class OpacityAccount extends EventEmitter {
       Fs.unlinkSync(savePath);
     }
 
+    const outputFile = Fs.createWriteStream(savePath, { encoding: 'binary' });
     let fileIndex = 0;
     let seek = 0;
     let partPath = Path.join(folderPath, fileIndex + '.part');
@@ -510,7 +528,7 @@ class OpacityAccount extends EventEmitter {
     for (let chunkIndex = 0; chunkIndex < chunksAmount; chunkIndex++) {
       let chunkRawBytes;
       let toReadBytes = chunkSize;
-      myBinaryFile.seek(seek);
+      //myBinaryFile.seek(seek);
       if (seek + toReadBytes >= Fs.statSync(partPath).size) {
         toReadBytes = Fs.statSync(partPath).size - seek;
         seek = 0;
@@ -524,16 +542,17 @@ class OpacityAccount extends EventEmitter {
         console.log(e);
       }
       const decryptedChunk = Helper.decryptFileChunk(chunkRawBytes, fileKey);
-      Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
+      await outputFile.write(decryptedChunk);
+      // Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
 
-      if(seek === 0 && chunkIndex + 1 !== chunksAmount){
+      if (seek === 0 && chunkIndex + 1 !== chunksAmount) {
         await myBinaryFile.close();
         partPath = Path.join(folderPath, fileIndex + '.part');
         myBinaryFile = new BinaryFile(partPath, 'r');
         await myBinaryFile.open();
       }
     }
-
+    await outputFile.close();
     await myBinaryFile.close();
 
     Fs.rmdirSync(folderPath, { recursive: true });
