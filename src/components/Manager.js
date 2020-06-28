@@ -100,19 +100,36 @@ const Manager = () => {
     ipcRenderer.send('path:update', traversedPath);
   }
 
-  function deleteFunc(handle, toDelete) {
-    ipcRenderer.send('file:delete', {
-      folder: folderPath,
-      handle: handle,
+  async function deleteFunc(handle, toDelete) {
+    const { value: result } = await Swal.fire({
+      title: 'Are you sure?',
+      html: `You won't be able to revert this!<br/>Deleting: ${toDelete}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!',
     });
-    ipcRenderer.once(`file:deleted:${handle}`, () => {
-      toast.update(handle, {
-        render: `${toDelete} deleted.`,
+
+    if (result) {
+      toast(`Deleting ${toDelete}`, {
+        toastId: handle,
+        autoClose: false,
       });
-      setTimeout(() => {
-        toast.dismiss(handle);
-      }, 3000);
-    });
+
+      ipcRenderer.send('file:delete', {
+        folder: folderPath,
+        handle: handle,
+      });
+      ipcRenderer.once(`file:deleted:${handle}`, () => {
+        toast.update(handle, {
+          render: `${toDelete} deleted.`,
+        });
+        setTimeout(() => {
+          toast.dismiss(handle);
+        }, 3000);
+      });
+    }
   }
 
   function uploadButton(e, isFolder = false) {
@@ -160,6 +177,7 @@ const Manager = () => {
       title: 'Enter the folder name',
       input: 'text',
       showCancelButton: true,
+      cancelButtonColor: '#d33',
       inputValidator: (value) => {
         if (!value) {
           return 'You need to write something!';
@@ -331,6 +349,7 @@ const Manager = () => {
                   folder={folder}
                   updatePath={updatePath}
                   downloadFunc={downloadFunc}
+                  deleteFunc={deleteFunc}
                 />
               );
             })}

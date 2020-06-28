@@ -150,11 +150,43 @@ class OpacityAccount extends EventEmitter {
         });
         metadata.metadata.files = newFiles;
         await this._setMetadata(metadata);
+        console.log(`Deleted file ${handle}`)
+        return true;
       } else {
         console.log(response);
       }
     } else if (handle.length === 64) {
-      console.log('folder deletion not implemented');
+      const folderToDelete = metadata.metadata.folders.find((folder) => folder.handle === handle)
+      const newFolderPath = Slash(Path.join(folder,folderToDelete.name));
+
+      const folderToDeleteMetadata = await this.getFolderMetadata(newFolderPath);
+
+      console.log(`Deleting ${newFolderPath}`)
+      for (const folder of folderToDeleteMetadata.metadata.folders){
+        await this.delete(newFolderPath, folder.handle)
+      }
+
+      for (const file of folderToDeleteMetadata.metadata.files){
+        await this.delete(newFolderPath, file.versions[0].handle)
+      }
+
+      const requestBody = {
+        "timestamp": Date.now(),
+        "metadataKey": handle,
+      }
+      const requestBodyJson = JSON.stringify(requestBody);
+      const payload = this._signPayload(requestBodyJson);
+      const payloadJson = JSON.stringify(payload);
+
+      const response = await Axios.post(this.baseUrl + "metadata/delete", payloadJson)
+
+      // Delete the folder now remove the folder from the parent folder
+
+      const newFolders = metadata.metadata.folders.filter((folder) => folder.handle !== handle);
+      metadata.metadata.folders = newFolders;
+      await this._setMetadata(metadata);
+      console.log(`Deleted ${newFolderPath}`)
+      return true;
     }
   }
 
@@ -268,7 +300,7 @@ class OpacityAccount extends EventEmitter {
         console.log(response);
       }
 
-      const promiseAmount = 5;
+      const promiseAmount = 1;
       for (
         let chunkIndex = 0, uploadProgress = 0;
         chunkIndex < endIndex;
@@ -415,11 +447,13 @@ class OpacityAccount extends EventEmitter {
       chunkData: encryptedData,
     });
 
+    console.time("upload-time");
     const response = await Axios.post(this.baseUrl + 'upload', form, {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
+    console.timeEnd("upload-time")
   }
 
   async download(opacityFolder, fileOrFolder, savingPath) {
@@ -577,11 +611,11 @@ class OpacityAccount extends EventEmitter {
   ) {
     console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
     const byteFrom = partIndex * partSize;
-    let byteTo = (partIndex + 1) * partSize - 1;
-    if (byteTo > uploadSize - 1) {
-      byteTo = uploadSize - 1;
+    let byteTo = byteFrom + partSize ;
+    if (byteTo > uploadSize) {
+      byteTo = uploadSize;
     }
-    const range = `bytes=${byteFrom}-${byteTo}`;
+    const range = `bytes=${byteFrom}-${byteTo-1}`;
     const response = await Axios.get(fileDownloadUrl, {
       responseType: 'arraybuffer',
       headers: { range },

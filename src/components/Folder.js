@@ -1,6 +1,7 @@
 import React from 'react';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import { ipcRenderer } from 'electron';
 import {
   AiFillFolder,
@@ -9,7 +10,7 @@ import {
   AiOutlineShareAlt,
 } from 'react-icons/ai';
 
-const Folder = ({ folder, updatePath, downloadFunc }) => {
+const Folder = ({ folder, updatePath, downloadFunc, deleteFunc }) => {
   return (
     <tr>
       <td>
@@ -26,13 +27,18 @@ const Folder = ({ folder, updatePath, downloadFunc }) => {
       <td></td>
       <td></td>
       <td>
-        <Button
-          onClick={() =>
-            downloadFunc({ handle: folder.handle, name: folder.name })
-          }
-        >
-          <AiOutlineDownload />
-        </Button>
+        <ButtonGroup>
+          <Button
+            onClick={() =>
+              downloadFunc({ handle: folder.handle, name: folder.name })
+            }
+          >
+            <AiOutlineDownload />
+          </Button>
+          <Button onClick={() => deleteFunc(folder.handle, folder.name)}>
+            <AiOutlineDelete></AiOutlineDelete>
+          </Button>
+        </ButtonGroup>
       </td>
     </tr>
   );

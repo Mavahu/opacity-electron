@@ -16,18 +16,6 @@ import {
 import { FiEdit } from 'react-icons/fi';
 
 const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
-  const toastId = React.useRef(null);
-  const deleteToastId = React.useRef(null);
-
-  const deleteToast = () => {
-    deleteToastId.current = toast(`Deleting ${file.name}`, {
-      toastId: file.versions[0].handle,
-      autoClose: false,
-    });
-
-    deleteFunc(file.versions[0].handle, file.name);
-  };
-
   const shareClick = (handle) => {
     Clipboardy.write('https://opacity.io/share#handle=' + handle);
     Swal.fire('', 'Copied the link to your clipboard!', 'success');
@@ -63,7 +51,9 @@ const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
           >
             <FiEdit />
           </Button>
-          <Button onClick={deleteToast}>
+          <Button
+            onClick={() => deleteFunc(file.versions[0].handle, file.name)}
+          >
             <AiOutlineDelete></AiOutlineDelete>
           </Button>
         </ButtonGroup>
