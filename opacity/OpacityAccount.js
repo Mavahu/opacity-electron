@@ -18,6 +18,7 @@ const Fs = require('fs');
 const Crypto = require('crypto');
 const FormData = require('form-data');
 const { EventEmitter } = require('events');
+var Semaphore = require('async-mutex').Semaphore;
 
 class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
@@ -31,6 +32,8 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
+    this.downloadSempahore = new Semaphore(5);
+    this.uploadSempahore = new Semaphore(5);
   }
 
   _signPayload(rawPayload) {
@@ -150,42 +153,51 @@ class OpacityAccount extends EventEmitter {
         });
         metadata.metadata.files = newFiles;
         await this._setMetadata(metadata);
-        console.log(`Deleted file ${handle}`)
+        console.log(`Deleted file ${handle}`);
         return true;
       } else {
         console.log(response);
       }
     } else if (handle.length === 64) {
-      const folderToDelete = metadata.metadata.folders.find((folder) => folder.handle === handle)
-      const newFolderPath = Slash(Path.join(folder,folderToDelete.name));
+      const folderToDelete = metadata.metadata.folders.find(
+        (folder) => folder.handle === handle
+      );
+      const newFolderPath = Slash(Path.join(folder, folderToDelete.name));
 
-      const folderToDeleteMetadata = await this.getFolderMetadata(newFolderPath);
+      const folderToDeleteMetadata = await this.getFolderMetadata(
+        newFolderPath
+      );
 
-      console.log(`Deleting ${newFolderPath}`)
-      for (const folder of folderToDeleteMetadata.metadata.folders){
-        await this.delete(newFolderPath, folder.handle)
+      console.log(`Deleting ${newFolderPath}`);
+      for (const folder of folderToDeleteMetadata.metadata.folders) {
+        await this.delete(newFolderPath, folder.handle);
       }
 
-      for (const file of folderToDeleteMetadata.metadata.files){
-        await this.delete(newFolderPath, file.versions[0].handle)
+      for (const file of folderToDeleteMetadata.metadata.files) {
+        await this.delete(newFolderPath, file.versions[0].handle);
       }
 
       const requestBody = {
-        "timestamp": Date.now(),
-        "metadataKey": handle,
-      }
+        timestamp: Date.now(),
+        metadataKey: handle,
+      };
       const requestBodyJson = JSON.stringify(requestBody);
       const payload = this._signPayload(requestBodyJson);
       const payloadJson = JSON.stringify(payload);
 
-      const response = await Axios.post(this.baseUrl + "metadata/delete", payloadJson)
+      const response = await Axios.post(
+        this.baseUrl + 'metadata/delete',
+        payloadJson
+      );
 
       // Delete the folder now remove the folder from the parent folder
 
-      const newFolders = metadata.metadata.folders.filter((folder) => folder.handle !== handle);
+      const newFolders = metadata.metadata.folders.filter(
+        (folder) => folder.handle !== handle
+      );
       metadata.metadata.folders = newFolders;
       await this._setMetadata(metadata);
-      console.log(`Deleted ${newFolderPath}`)
+      console.log(`Deleted ${newFolderPath}`);
       return true;
     }
   }
@@ -300,37 +312,15 @@ class OpacityAccount extends EventEmitter {
         console.log(response);
       }
 
-      const promiseAmount = 1;
-      for (
-        let chunkIndex = 0, uploadProgress = 0;
-        chunkIndex < endIndex;
-        chunkIndex += promiseAmount
-      ) {
-        const promises = [];
-        Array(promiseAmount)
-          .fill()
-          .map((_, i) => {
-            if (i + chunkIndex < endIndex) {
-              promises.push(
-                this._uploadFilePart(
-                  fileData,
-                  fileMetaData,
-                  handle,
-                  i + chunkIndex,
-                  endIndex
-                )
-              );
-              uploadProgress++;
-            }
-          });
-        await Promise.all(promises);
-        this.emit(
-          `upload:progress:${handleHex}`,
-          uploadProgress !== endIndex
-            ? Math.round((uploadProgress / endIndex) * 100)
-            : 99.9
-        );
-      }
+      const promises = [];
+      Array(endIndex)
+        .fill()
+        .map((_, i) => {
+          promises.push(
+            this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex)
+          );
+        });
+      await Promise.all(promises);
 
       // Verify Upload & Retry missing parts
       requestBody = { fileHandle: fileId };
@@ -409,51 +399,63 @@ class OpacityAccount extends EventEmitter {
     currentIndex,
     endIndex
   ) {
-    console.log(`Uploading Part ${currentIndex + 1} out of ${endIndex}`);
-    const fileId = handle.slice(0, 32).toString('hex');
-    const keyBytes = handle.slice(32, 64);
-
-    const rawpart = await Helper.getPartial(
-      fileData,
-      fileMetadata.p.partSize,
-      currentIndex
-    );
-
-    const numChunks = Math.ceil(rawpart.length / fileMetadata.p.blockSize);
-    let encryptedData = Buffer.alloc(0);
-    for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
-      const remaining = rawpart.length - chunkIndex * fileMetadata.p.blockSize;
-      if (remaining <= 0) {
-        break;
-      }
-      const chunkSize = Math.min(remaining, fileMetadata.p.blockSize);
-      const chunk = rawpart.slice(
-        chunkIndex * fileMetadata.p.blockSize,
-        chunkIndex * fileMetadata.p.blockSize + chunkSize
+    const [value, release] = await this.uploadSempahore.acquire();
+    try {
+      this.emit(
+        `upload:progress:${handle.toString('hex')}`,
+        currentIndex + 1 !== endIndex
+          ? Math.round((currentIndex / endIndex) * 100)
+          : 99.9
       );
-      const encryptedChunk = Helper.encrypt(chunk, keyBytes);
-      encryptedData = Buffer.concat([encryptedData, encryptedChunk]);
+      console.log(`Uploading Part ${currentIndex + 1} out of ${endIndex}`);
+      const fileId = handle.slice(0, 32).toString('hex');
+      const keyBytes = handle.slice(32, 64);
+
+      const rawpart = await Helper.getPartial(
+        fileData,
+        fileMetadata.p.partSize,
+        currentIndex
+      );
+
+      const numChunks = Math.ceil(rawpart.length / fileMetadata.p.blockSize);
+      let encryptedData = Buffer.alloc(0);
+      for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
+        const remaining =
+          rawpart.length - chunkIndex * fileMetadata.p.blockSize;
+        if (remaining <= 0) {
+          break;
+        }
+        const chunkSize = Math.min(remaining, fileMetadata.p.blockSize);
+        const chunk = rawpart.slice(
+          chunkIndex * fileMetadata.p.blockSize,
+          chunkIndex * fileMetadata.p.blockSize + chunkSize
+        );
+        const encryptedChunk = Helper.encrypt(chunk, keyBytes);
+        encryptedData = Buffer.concat([encryptedData, encryptedChunk]);
+      }
+
+      const requestBody = {
+        fileHandle: fileId,
+        partIndex: currentIndex + 1,
+        endIndex: endIndex,
+      };
+
+      const requestBodyJson = JSON.stringify(requestBody);
+
+      const form = this._signPayloadForm(requestBodyJson, {
+        chunkData: encryptedData,
+      });
+
+      const time = Date.now();
+      const response = await Axios.post(this.baseUrl + 'upload', form, {
+        headers: form.getHeaders(),
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
+      console.log(`Upload-time: ${Date.now() - time}ms`);
+    } finally {
+      release();
     }
-
-    const requestBody = {
-      fileHandle: fileId,
-      partIndex: currentIndex + 1,
-      endIndex: endIndex,
-    };
-
-    const requestBodyJson = JSON.stringify(requestBody);
-
-    const form = this._signPayloadForm(requestBodyJson, {
-      chunkData: encryptedData,
-    });
-
-    console.time("upload-time");
-    const response = await Axios.post(this.baseUrl + 'upload', form, {
-      headers: form.getHeaders(),
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-    });
-    console.timeEnd("upload-time")
   }
 
   async download(opacityFolder, fileOrFolder, savingPath) {
@@ -509,32 +511,26 @@ class OpacityAccount extends EventEmitter {
     console.log(`Downloading file: ${fileMetaoptions.name}`);
     const fileDownloadUrl = downloadUrl + '/file';
 
-    const promiseAmount = 5;
-    for (let part = 0, partProgress = 0; part < parts; part += promiseAmount) {
-      const promises = [];
-      Array(promiseAmount)
-        .fill()
-        .map((_, i) => {
-          if (i + part < parts) {
-            promises.push(
-              this._downloadPart(
-                part + i,
-                parts,
-                partSize,
-                uploadSize,
-                fileDownloadUrl,
-                folderPath
-              )
-            );
-            partProgress++;
-          }
-        });
-      await Promise.all(promises);
-      this.emit(
-        `download:progress:${handle}`,
-        partProgress !== parts ? Math.round((partProgress / parts) * 100) : 99.9
-      );
-    }
+    const promises = [];
+    const time = Date.now();
+    Array(parts)
+      .fill()
+      .map((_, i) => {
+        promises.push(
+          this._downloadPart(
+            i,
+            parts,
+            partSize,
+            uploadSize,
+            fileDownloadUrl,
+            folderPath,
+            handle
+          )
+        );
+      });
+    await Promise.allSettled(promises);
+    console.log('Total time: ' + (Date.now() - time) / 1000);
+    this.emit(`download:progress:${handle}`, 99.9);
 
     /*this.emit(
         `download:progress:${handle}`,
@@ -607,21 +603,35 @@ class OpacityAccount extends EventEmitter {
     partSize,
     uploadSize,
     fileDownloadUrl,
-    folderPath
+    folderPath,
+    handle
   ) {
-    console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
-    const byteFrom = partIndex * partSize;
-    let byteTo = byteFrom + partSize ;
-    if (byteTo > uploadSize) {
-      byteTo = uploadSize;
+    const [value, release] = await this.downloadSempahore.acquire();
+    try {
+      this.emit(
+        `download:progress:${handle}`,
+        partIndex + 1 !== endPartIndex
+          ? Math.round((partIndex / endPartIndex) * 100)
+          : 99.9
+      );
+      const time = Date.now();
+      console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
+      const byteFrom = partIndex * partSize;
+      let byteTo = byteFrom + partSize;
+      if (byteTo > uploadSize) {
+        byteTo = uploadSize;
+      }
+      const range = `bytes=${byteFrom}-${byteTo - 1}`;
+      const response = await Axios.get(fileDownloadUrl, {
+        responseType: 'arraybuffer',
+        headers: { range },
+      });
+      const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
+      Fs.writeFileSync(fileToWriteTo, response.data);
+      console.log(`Download-time: ${Date.now() - time}ms`);
+    } finally {
+      release();
     }
-    const range = `bytes=${byteFrom}-${byteTo-1}`;
-    const response = await Axios.get(fileDownloadUrl, {
-      responseType: 'arraybuffer',
-      headers: { range },
-    });
-    const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
-    Fs.writeFileSync(fileToWriteTo, response.data);
   }
 
   async _downloadFolder(opacityFolder, folderToDownload, savingPath) {
