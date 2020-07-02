@@ -14,8 +14,19 @@ import {
   AiOutlineShareAlt,
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
+import Styled from 'styled-components';
 
-const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
+const Checkbox = Styled.input.attrs({
+  type: 'checkbox',
+})``;
+
+const File = ({
+  file,
+  deleteFunc,
+  downloadFunc,
+  renameFunc,
+  changeCheckboxState,
+}) => {
   const shareClick = (handle) => {
     Clipboardy.write('https://opacity.io/share#handle=' + handle);
     Swal.fire('', 'Copied the link to your clipboard!', 'success');
@@ -24,7 +35,12 @@ const File = ({ file, deleteFunc, downloadFunc, renameFunc }) => {
   return (
     <tr>
       <td>
-        <Form.Check aria-label="option 1" />
+        <Checkbox
+          checked={file.checked}
+          onChange={(t) =>
+            changeCheckboxState(t.target.checked, file.versions[0].handle)
+          }
+        />
       </td>
       <td>
         <AiOutlineFile />

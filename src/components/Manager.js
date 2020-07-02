@@ -19,6 +19,11 @@ import FormGroup from 'react-bootstrap/FormGroup';
 import FormLabel from 'react-bootstrap/FormLabel';
 import FormControl from 'react-bootstrap/FormControl';
 import Swal from 'sweetalert2';
+import Styled from 'styled-components';
+
+const Checkbox = Styled.input.attrs({
+  type: 'checkbox',
+})``;
 
 const Manager = () => {
   const [folderPath, setFolderPath] = useState('/');
@@ -48,15 +53,86 @@ const Manager = () => {
     },
   };
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
+  const [deleteButton, setDeleteButton] = useState(false);
+  const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
       if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
-        setMetadata(newMetadata.metadata);
+        addCheckboxValues(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
     });
   }, []);
+
+  function addCheckboxValues(metadata) {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+    copyMetadata.folders.forEach(function (folder) {
+      folder.checked = false;
+    });
+    copyMetadata.files.forEach(function (file) {
+      file.checked = false;
+    });
+    setMetadata(copyMetadata);
+    setDeleteButton(false);
+    setSelectAllCheckbox(false);
+  }
+
+  function changeAllCheckboxState(checked) {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+    copyMetadata.folders.forEach(function (folder) {
+      folder.checked = checked;
+    });
+    copyMetadata.files.forEach(function (file) {
+      file.checked = checked;
+    });
+    if (checked) {
+      setDeleteButton(true);
+      setSelectAllCheckbox(true);
+    } else {
+      setDeleteButton(false);
+      setSelectAllCheckbox(false);
+    }
+    setMetadata(copyMetadata);
+  }
+
+  function changeFolderCheckboxState(checked, handle) {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+    copyMetadata.folders.forEach(function (folder) {
+      if (folder.handle === handle) {
+        folder.checked = checked;
+      }
+    });
+    const checkedFolders = copyMetadata.folders.find(
+      (folder) => folder.checked
+    );
+    const checkedFiles = copyMetadata.files.find((file) => file.checked);
+    if (checkedFolders || checkedFiles) {
+      setDeleteButton(true);
+    } else {
+      setDeleteButton(false);
+    }
+    setMetadata(copyMetadata);
+  }
+
+  function changeFileCheckboxState(checked, handle) {
+    const copyMetadata = JSON.parse(JSON.stringify(metadata));
+    copyMetadata.files.forEach(function (file) {
+      if (file.versions[0].handle === handle) {
+        file.checked = checked;
+      }
+    });
+    const checkedFolders = copyMetadata.folders.find(
+      (folder) => folder.checked
+    );
+    const checkedFiles = copyMetadata.files.find((file) => file.checked);
+    if (checkedFolders || checkedFiles) {
+      setDeleteButton(true);
+    } else {
+      setDeleteButton(false);
+    }
+    setMetadata(copyMetadata);
+  }
 
   useEffect(() => {
     ipcRenderer.on('toast:create', (e, data) =>
@@ -112,23 +188,14 @@ const Manager = () => {
     });
 
     if (result) {
-      toast(`Deleting ${toDelete}`, {
-        toastId: handle,
-        autoClose: false,
-      });
-
-      ipcRenderer.send('file:delete', {
-        folder: folderPath,
-        handle: handle,
-      });
-      ipcRenderer.once(`file:deleted:${handle}`, () => {
-        toast.update(handle, {
-          render: `${toDelete} deleted.`,
-        });
-        setTimeout(() => {
-          toast.dismiss(handle);
-        }, 3000);
-      });
+      ipcRenderer.send('files:delete', [
+        {
+          folder: folderPath,
+          handle: handle,
+          name: toDelete,
+        },
+      ]);
+      changeAllCheckboxState(false);
     }
   }
 
@@ -282,6 +349,44 @@ const Manager = () => {
     setMetadata(copyMetadata);
   }
 
+  async function deleteSelected() {
+    const checkedFolders = metadata.folders.filter((folder) => folder.checked);
+    const checkedFiles = metadata.files.filter((file) => file.checked);
+    const { value: result } = await Swal.fire({
+      title: 'Are you sure?',
+      html: `You won't be able to revert this!<br/>Folders: ${checkedFolders
+        .map((folder) => '<li>' + folder.name + '</li>')
+        .join('')}<br/>Files: ${checkedFiles
+        .map((file) => '<li>' + file.name + '</li> ')
+        .join('')}`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!',
+    });
+
+    if (result) {
+      const toDelete = [];
+      checkedFolders.map((folder) =>
+        toDelete.push({
+          folder: folderPath,
+          handle: folder.handle,
+          name: folder.name,
+        })
+      );
+      checkedFiles.map((file) =>
+        toDelete.push({
+          folder: folderPath,
+          handle: file.versions[0].handle,
+          name: file.name,
+        })
+      );
+      ipcRenderer.send('files:delete', toDelete);
+      changeAllCheckboxState(false);
+    }
+  }
+
   return (
     <Container>
       <ButtonToolbar
@@ -301,6 +406,11 @@ const Manager = () => {
         </ButtonGroup>
         <ButtonGroup>
           <Card className="mr-1">
+            <Button disabled={!deleteButton} onClick={() => deleteSelected()}>
+              Delete
+            </Button>
+          </Card>
+          <Card className="mr-1">
             <Button onClick={() => newFolder()}>Create Folder</Button>
           </Card>
           <Card>
@@ -316,7 +426,13 @@ const Manager = () => {
       <Table size="sm">
         <thead>
           <tr>
-            <th></th>
+            <th>
+              {' '}
+              <Checkbox
+                checked={selectAllCheckbox}
+                onChange={(t) => changeAllCheckboxState(t.target.checked)}
+              />
+            </th>
             <th></th>
             <th>
               <Button variant="outline-secondary" onClick={sortName}>
@@ -350,6 +466,7 @@ const Manager = () => {
                   updatePath={updatePath}
                   downloadFunc={downloadFunc}
                   deleteFunc={deleteFunc}
+                  changeCheckboxState={changeFolderCheckboxState}
                 />
               );
             })}
@@ -362,6 +479,7 @@ const Manager = () => {
                   deleteFunc={deleteFunc}
                   downloadFunc={downloadFunc}
                   renameFunc={renameFunc}
+                  changeCheckboxState={changeFileCheckboxState}
                 />
               );
             })}

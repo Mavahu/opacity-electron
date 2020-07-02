@@ -7,14 +7,27 @@ import {
   AiFillFolder,
   AiOutlineDownload,
   AiOutlineDelete,
-  AiOutlineShareAlt,
 } from 'react-icons/ai';
+import Styled from 'styled-components';
 
-const Folder = ({ folder, updatePath, downloadFunc, deleteFunc }) => {
+const Checkbox = Styled.input.attrs({
+  type: 'checkbox',
+})``;
+
+const Folder = ({
+  folder,
+  updatePath,
+  downloadFunc,
+  deleteFunc,
+  changeCheckboxState,
+}) => {
   return (
     <tr>
       <td>
-        <Form.Check aria-label="option 1" />
+        <Checkbox
+          checked={folder.checked}
+          onChange={(t) => changeCheckboxState(t.target.checked, folder.handle)}
+        />
       </td>
       <td>
         <AiFillFolder />

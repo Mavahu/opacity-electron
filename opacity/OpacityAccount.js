@@ -18,7 +18,7 @@ const Fs = require('fs');
 const Crypto = require('crypto');
 const FormData = require('form-data');
 const { EventEmitter } = require('events');
-var Semaphore = require('async-mutex').Semaphore;
+const { Semaphore, Mutex } = require('async-mutex');
 
 class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
@@ -32,8 +32,11 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
-    this.downloadSempahore = new Semaphore(5);
-    this.uploadSempahore = new Semaphore(5);
+    this.downloadMutex = new Mutex();
+    this.downloadChunksSemaphore = new Semaphore(10);
+    this.uploadMutex = new Mutex();
+    this.uploadChunksSemaphore = new Semaphore(5);
+    this.metadataMutex = new Mutex();
   }
 
   _signPayload(rawPayload) {
@@ -64,11 +67,6 @@ class OpacityAccount extends EventEmitter {
     form.append('publicKey', this.masterKey.publicKey.toString('hex'));
 
     Object.keys(additionalPayload).forEach((key) => {
-      // element is the name of the key.
-      // key is just a numerical value for the array
-      // _array is the array of all the keys
-
-      // this keyword = secondArg
       form.append(key, additionalPayload[key], key);
     });
 
@@ -133,10 +131,25 @@ class OpacityAccount extends EventEmitter {
     return FolderMetadata.toObject(decryptedJson);
   }
 
-  async delete(folder, handle) {
-    const metadata = await this.getFolderMetadata(folder);
+  async delete(folder, handle, name) {
+    const release = await this.metadataMutex.acquire();
+    this.emit('delete:init', { handle: handle, fileName: name });
+    try {
+      const response = await this._deleteHandler(folder, handle);
+      if (response) {
+        this.emit(`delete:finished:${handle}`);
+      }
+      return response;
+    } catch (e) {
+      console.log(e);
+    } finally {
+      release();
+    }
+  }
 
+  async _deleteHandler(folder, handle) {
     if (handle.length === 128) {
+      const metadata = await this.getFolderMetadata(folder);
       const rawPayload = {
         fileId: handle.slice(0, 64),
       };
@@ -159,6 +172,7 @@ class OpacityAccount extends EventEmitter {
         console.log(response);
       }
     } else if (handle.length === 64) {
+      const metadata = await this.getFolderMetadata(folder);
       const folderToDelete = metadata.metadata.folders.find(
         (folder) => folder.handle === handle
       );
@@ -170,11 +184,11 @@ class OpacityAccount extends EventEmitter {
 
       console.log(`Deleting ${newFolderPath}`);
       for (const folder of folderToDeleteMetadata.metadata.folders) {
-        await this.delete(newFolderPath, folder.handle);
+        await this._deleteHandler(newFolderPath, folder.handle);
       }
 
       for (const file of folderToDeleteMetadata.metadata.files) {
-        await this.delete(newFolderPath, file.versions[0].handle);
+        await this._deleteHandler(newFolderPath, file.versions[0].handle);
       }
 
       const requestBody = {
@@ -233,6 +247,17 @@ class OpacityAccount extends EventEmitter {
   }
 
   async upload(folder, fileOrFolderPath) {
+    const release = await this.uploadMutex.acquire();
+    try {
+      return await this._uploadHandler(folder, fileOrFolderPath);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      release();
+    }
+  }
+
+  async _uploadHandler(folder, fileOrFolderPath) {
     let fileStats = Fs.lstatSync(fileOrFolderPath);
     if (fileStats.isFile()) {
       return await this.uploadFile(folder, fileOrFolderPath);
@@ -250,7 +275,7 @@ class OpacityAccount extends EventEmitter {
     const files = Fs.readdirSync(folderPath);
     for (let index = 0; index < files.length; index++) {
       const toUpload = Path.join(folderPath, files[index]);
-      await this.upload(finalPath, toUpload);
+      await this._uploadHandler(finalPath, toUpload);
     }
     return response;
   }
@@ -320,7 +345,7 @@ class OpacityAccount extends EventEmitter {
             this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex)
           );
         });
-      await Promise.all(promises);
+      await Promise.allSettled(promises);
 
       // Verify Upload & Retry missing parts
       requestBody = { fileHandle: fileId };
@@ -380,9 +405,14 @@ class OpacityAccount extends EventEmitter {
         )
       );
 
-      const metadata = await this.getFolderMetadata(folder);
-      metadata.metadata.files.push(fileInfo);
-      await this._setMetadata(metadata);
+      const release = await this.metadataMutex.acquire();
+      try {
+        const metadata = await this.getFolderMetadata(folder);
+        metadata.metadata.files.push(fileInfo);
+        await this._setMetadata(metadata);
+      } finally {
+        release();
+      }
       console.log(`Uploaded file: ${fileData.name}`);
       this.emit(`upload:finished:${handleHex}`);
       return true;
@@ -399,12 +429,12 @@ class OpacityAccount extends EventEmitter {
     currentIndex,
     endIndex
   ) {
-    const [value, release] = await this.uploadSempahore.acquire();
+    const [value, release] = await this.uploadChunksSemaphore.acquire();
     try {
       this.emit(
         `upload:progress:${handle.toString('hex')}`,
         currentIndex + 1 !== endIndex
-          ? Math.round((currentIndex / endIndex) * 100)
+          ? Math.floor((currentIndex / endIndex) * 100)
           : 99.9
       );
       console.log(`Uploading Part ${currentIndex + 1} out of ${endIndex}`);
@@ -446,27 +476,32 @@ class OpacityAccount extends EventEmitter {
         chunkData: encryptedData,
       });
 
-      const time = Date.now();
+      //const time = Date.now();
       const response = await Axios.post(this.baseUrl + 'upload', form, {
         headers: form.getHeaders(),
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
       });
-      console.log(`Upload-time: ${Date.now() - time}ms`);
+      //console.log(`Upload-time: ${Date.now() - time}ms`);
     } finally {
       release();
     }
   }
 
   async download(opacityFolder, fileOrFolder, savingPath) {
-    if (fileOrFolder.handle.length === 128) {
-      return await this._downloadFile(fileOrFolder.handle, savingPath);
-    } else {
-      return await this._downloadFolder(
-        opacityFolder,
-        fileOrFolder.name,
-        savingPath
-      );
+    const release = await this.downloadMutex.acquire();
+    try {
+      if (fileOrFolder.handle.length === 128) {
+        return await this._downloadFile(fileOrFolder.handle, savingPath);
+      } else {
+        return await this._downloadFolder(
+          opacityFolder,
+          fileOrFolder.name,
+          savingPath
+        );
+      }
+    } finally {
+      release();
     }
   }
 
@@ -530,14 +565,6 @@ class OpacityAccount extends EventEmitter {
       });
     await Promise.allSettled(promises);
     console.log('Total time: ' + (Date.now() - time) / 1000);
-    this.emit(`download:progress:${handle}`, 99.9);
-
-    /*this.emit(
-        `download:progress:${handle}`,
-        part + 1 !== parts
-          ? Math.round(((part + 1) / parts + Number.EPSILON) * 100)
-          : 99
-      );*/
 
     // Reconstruct file out of the parts
     console.log('Reconstructing');
@@ -606,15 +633,14 @@ class OpacityAccount extends EventEmitter {
     folderPath,
     handle
   ) {
-    const [value, release] = await this.downloadSempahore.acquire();
+    const [value, release] = await this.downloadChunksSemaphore.acquire();
     try {
       this.emit(
         `download:progress:${handle}`,
         partIndex + 1 !== endPartIndex
-          ? Math.round((partIndex / endPartIndex) * 100)
+          ? Math.floor((partIndex / endPartIndex) * 100)
           : 99.9
       );
-      const time = Date.now();
       console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
       const byteFrom = partIndex * partSize;
       let byteTo = byteFrom + partSize;
@@ -628,7 +654,6 @@ class OpacityAccount extends EventEmitter {
       });
       const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
       Fs.writeFileSync(fileToWriteTo, response.data);
-      console.log(`Download-time: ${Date.now() - time}ms`);
     } finally {
       release();
     }
@@ -665,9 +690,14 @@ class OpacityAccount extends EventEmitter {
         folderName,
         metadata.hashedFolderKey
       );
-      const parentMetadata = await this.getFolderMetadata(parentFolder);
-      parentMetadata.metadata.folders.push(newFolder);
-      await this._setMetadata(parentMetadata);
+      const release = await this.metadataMutex.acquire();
+      try {
+        const parentMetadata = await this.getFolderMetadata(parentFolder);
+        parentMetadata.metadata.folders.push(newFolder);
+        await this._setMetadata(parentMetadata);
+      } finally {
+        release();
+      }
       console.log(`Created successfully: ${folderPath}`);
       return true;
     } else {
@@ -728,17 +758,22 @@ class OpacityAccount extends EventEmitter {
 
   async rename(folder, handle, newName) {
     if (handle.length === 128) {
-      const metadata = await this.getFolderMetadata(folder);
-      let oldname = '';
-      for (const file of metadata.metadata.files) {
-        if (file.versions[0].handle === handle) {
-          oldname = file.name;
-          file.name = newName;
-          break;
+      const release = await this.metadataMutex.acquire();
+      try {
+        const metadata = await this.getFolderMetadata(folder);
+        let oldname = '';
+        for (const file of metadata.metadata.files) {
+          if (file.versions[0].handle === handle) {
+            oldname = file.name;
+            file.name = newName;
+            break;
+          }
         }
+        await this._setMetadata(metadata);
+        console.log(`Successfully renamed ${oldname} into ${newName}`);
+      } finally {
+        release();
       }
-      await this._setMetadata(metadata);
-      console.log(`Successfully renamed ${oldname} into ${newName}`);
     } else {
       console.log('Folder renaming not implemented yet!');
     }

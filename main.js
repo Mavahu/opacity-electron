@@ -137,11 +137,14 @@ ipcMain.on('path:update', async (e, newPath) => {
   refreshFolder(newPath, true);
 });
 
-ipcMain.on('file:delete', async (e, file) => {
-  if (await account.delete(file.folder, file.handle)) {
-    refreshFolder(file.folder);
+ipcMain.on('files:delete', async (e, files) => {
+  console.log('deleting');
+  for (const file of files) {
+    if (await account.delete(file.folder, file.handle, file.name)) {
+      refreshFolder(file.folder);
+    }
+    mainWindow.webContents.send(`file:deleted:${file.handle}`);
   }
-  mainWindow.webContents.send(`file:deleted:${file.handle}`);
 });
 
 ipcMain.on('files:upload', async (e, toUpload) => {
@@ -224,6 +227,22 @@ async function setAccount(handle) {
       });
       account.removeAllListeners(`upload:progress:${file.handle}`);
       account.removeAllListeners(`upload:finished:${file.handle}`);
+    });
+  });
+
+  account.on(`delete:init`, (file) => {
+    mainWindow.webContents.send('toast:create', {
+      text: `Deleting: ${file.fileName}`,
+      toastId: file.handle,
+    });
+
+    account.on(`delete:finished:${file.handle}`, () => {
+      mainWindow.webContents.send('toast:finished', {
+        text: `Deleted ${file.fileName}`,
+        toastId: file.handle,
+      });
+
+      account.removeAllListeners(`delete:finished:${file.handle}`);
     });
   });
 }
