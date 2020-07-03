@@ -2,7 +2,8 @@ import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
 import slash from 'slash';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
@@ -10,16 +11,12 @@ import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import Card from 'react-bootstrap/Card';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Form from 'react-bootstrap/Form';
 import File from './File';
 import Folder from './Folder';
-import FormGroup from 'react-bootstrap/FormGroup';
-import FormLabel from 'react-bootstrap/FormLabel';
-import FormControl from 'react-bootstrap/FormControl';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -166,6 +163,24 @@ const Manager = () => {
       }, 3000);
     });
   }, []);
+
+  const onDrop = useCallback(
+    (acceptedFiles) => {
+      console.log(acceptedFiles);
+      const toUpload = {
+        files: acceptedFiles.map((file) => file.path),
+        folder: folderPath,
+      };
+      ipcRenderer.send('files:upload', toUpload);
+    },
+    [folderPath]
+  );
+
+  const { isDragActive, getRootProps } = useDropzone({
+    onDrop,
+    minSize: 1,
+    multiple: true,
+  });
 
   function updatePath(newPath) {
     const updatedPath = slash(Path.join(folderPath, newPath));
@@ -411,7 +426,7 @@ const Manager = () => {
   }
 
   return (
-    <Container>
+    <Container fluid {...getRootProps()}>
       <ButtonToolbar
         className="justify-content-between"
         aria-label="Toolbar with Button groups"
