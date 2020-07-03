@@ -57,7 +57,9 @@ const File = ({
           </Button>
           <Button
             onClick={() =>
-              downloadFunc({ handle: file.versions[0].handle, name: file.name })
+              downloadFunc([
+                { handle: file.versions[0].handle, name: file.name },
+              ])
             }
           >
             <AiOutlineDownload />

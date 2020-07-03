@@ -55,6 +55,7 @@ const Manager = () => {
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
   const [deleteButton, setDeleteButton] = useState(false);
   const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
+  const [downloadButton, setDownloadButton] = useState(false);
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
@@ -75,6 +76,7 @@ const Manager = () => {
     });
     setMetadata(copyMetadata);
     setDeleteButton(false);
+    setDownloadButton(false);
     setSelectAllCheckbox(false);
   }
 
@@ -88,9 +90,11 @@ const Manager = () => {
     });
     if (checked) {
       setDeleteButton(true);
+      setDownloadButton(true);
       setSelectAllCheckbox(true);
     } else {
       setDeleteButton(false);
+      setDownloadButton(false);
       setSelectAllCheckbox(false);
     }
     setMetadata(copyMetadata);
@@ -109,8 +113,10 @@ const Manager = () => {
     const checkedFiles = copyMetadata.files.find((file) => file.checked);
     if (checkedFolders || checkedFiles) {
       setDeleteButton(true);
+      setDownloadButton(true);
     } else {
       setDeleteButton(false);
+      setDownloadButton(false);
     }
     setMetadata(copyMetadata);
   }
@@ -128,8 +134,10 @@ const Manager = () => {
     const checkedFiles = copyMetadata.files.find((file) => file.checked);
     if (checkedFolders || checkedFiles) {
       setDeleteButton(true);
+      setDownloadButton(true);
     } else {
       setDeleteButton(false);
+      setDownloadButton(false);
     }
     setMetadata(copyMetadata);
   }
@@ -229,7 +237,7 @@ const Manager = () => {
         if (!result.canceled) {
           ipcRenderer.send('files:download', {
             folder: folderPath,
-            files: [item],
+            files: item,
             savingPath: result.filePaths[0],
           });
         }
@@ -387,6 +395,21 @@ const Manager = () => {
     }
   }
 
+  async function downloadSelected() {
+    const toDownload = [];
+    const checkedFolders = metadata.folders.map((folder) => {
+      if (folder.checked) {
+        toDownload.push({ name: folder.name, handle: folder.handle });
+      }
+    });
+    const checkedFiles = metadata.files.map((file) => {
+      if (file.checked) {
+        toDownload.push({ name: file.name, handle: file.versions[0].handle });
+      }
+    });
+    await downloadFunc(toDownload);
+  }
+
   return (
     <Container>
       <ButtonToolbar
@@ -405,6 +428,14 @@ const Manager = () => {
           })}
         </ButtonGroup>
         <ButtonGroup>
+          <Card>
+            <Button
+              disabled={!downloadButton}
+              onClick={() => downloadSelected()}
+            >
+              Download
+            </Button>
+          </Card>
           <Card className="mr-1">
             <Button disabled={!deleteButton} onClick={() => deleteSelected()}>
               Delete

@@ -43,7 +43,7 @@ const Folder = ({
         <ButtonGroup>
           <Button
             onClick={() =>
-              downloadFunc({ handle: folder.handle, name: folder.name })
+              downloadFunc([{ handle: folder.handle, name: folder.name }])
             }
           >
             <AiOutlineDownload />

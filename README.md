@@ -1,6 +1,6 @@
-## Simple Electron React Boilerplate
+## Opacity Desktop Application
 
-This is a simple boilerplate to get up and running with Electron and React. It is a customized version of [Alex Devero's](https://github.com/alexdevero/electron-react-webpack-boilerplate) repo and is used in my Electron course
+This desktop application allows you to interact with your previously created account from [Opacity](https://www.opacity.io/).
 
 ### Install
 
@@ -73,4 +73,4 @@ yarn prod
 ### Change app title
 
 Change the app title in the **webpack.build.config.js** and the **webpack.dev.config.js** files
-"# opacity-electron" 
+"# opacity-electron"
