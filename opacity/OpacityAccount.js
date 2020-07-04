@@ -147,7 +147,7 @@ class OpacityAccount extends EventEmitter {
     }
   }
 
-  async _deleteHandler(folder, handle) {
+  async _deleteHandler(folder, handle, deleteFiles = true) {
     if (handle.length === 128) {
       const metadata = await this.getFolderMetadata(folder);
       const rawPayload = {
@@ -184,11 +184,17 @@ class OpacityAccount extends EventEmitter {
 
       console.log(`Deleting ${newFolderPath}`);
       for (const folder of folderToDeleteMetadata.metadata.folders) {
-        await this._deleteHandler(newFolderPath, folder.handle);
+        await this._deleteHandler(newFolderPath, folder.handle, deleteFiles);
       }
 
-      for (const file of folderToDeleteMetadata.metadata.files) {
-        await this._deleteHandler(newFolderPath, file.versions[0].handle);
+      if (deleteFiles) {
+        for (const file of folderToDeleteMetadata.metadata.files) {
+          await this._deleteHandler(
+            newFolderPath,
+            file.versions[0].handle,
+            deleteFiles
+          );
+        }
       }
 
       const requestBody = {
@@ -260,13 +266,13 @@ class OpacityAccount extends EventEmitter {
   async _uploadHandler(folder, fileOrFolderPath) {
     let fileStats = Fs.lstatSync(fileOrFolderPath);
     if (fileStats.isFile()) {
-      return await this.uploadFile(folder, fileOrFolderPath);
+      return await this._uploadFile(folder, fileOrFolderPath);
     } else {
-      return await this.uploadFolder(folder, fileOrFolderPath);
+      return await this._uploadFolder(folder, fileOrFolderPath);
     }
   }
 
-  async uploadFolder(folder, folderPath) {
+  async _uploadFolder(folder, folderPath) {
     const folderName = Path.basename(folderPath);
     const finalPath = Slash(Path.join(folder, folderName));
 
@@ -280,7 +286,7 @@ class OpacityAccount extends EventEmitter {
     return response;
   }
 
-  async uploadFile(folder, filePath) {
+  async _uploadFile(folder, filePath) {
     try {
       const fileName = Path.basename(filePath);
       const stats = Fs.statSync(filePath);
@@ -682,6 +688,15 @@ class OpacityAccount extends EventEmitter {
   }
 
   async createFolder(folderPath) {
+    const release = await this.metadataMutex.acquire();
+    try {
+      return await this._createFolderHandler(folderPath);
+    } finally {
+      release();
+    }
+  }
+
+  async _createFolderHandler(folderPath) {
     const parentFolder = Path.dirname(folderPath);
     const folderName = Path.basename(folderPath);
     const { metadata, add } = await this._createMetadataFolder(folderPath);
@@ -690,14 +705,9 @@ class OpacityAccount extends EventEmitter {
         folderName,
         metadata.hashedFolderKey
       );
-      const release = await this.metadataMutex.acquire();
-      try {
-        const parentMetadata = await this.getFolderMetadata(parentFolder);
-        parentMetadata.metadata.folders.push(newFolder);
-        await this._setMetadata(parentMetadata);
-      } finally {
-        release();
-      }
+      const parentMetadata = await this.getFolderMetadata(parentFolder);
+      parentMetadata.metadata.folders.push(newFolder);
+      await this._setMetadata(parentMetadata);
       console.log(`Created successfully: ${folderPath}`);
       return true;
     } else {
@@ -756,26 +766,86 @@ class OpacityAccount extends EventEmitter {
     return { hashedFolderKey: hashedFolderKey, keyString: keyString };
   }
 
-  async rename(folder, handle, newName) {
-    if (handle.length === 128) {
-      const release = await this.metadataMutex.acquire();
-      try {
+  async rename(folder, item, newName) {
+    const release = await this.metadataMutex.acquire();
+    try {
+      if (item.handle.length === 128) {
         const metadata = await this.getFolderMetadata(folder);
-        let oldname = '';
         for (const file of metadata.metadata.files) {
-          if (file.versions[0].handle === handle) {
-            oldname = file.name;
+          if (file.versions[0].handle === item.handle) {
             file.name = newName;
             break;
           }
         }
         await this._setMetadata(metadata);
-        console.log(`Successfully renamed ${oldname} into ${newName}`);
-      } finally {
-        release();
+        console.log(`Successfully renamed ${item.name} into ${newName}`);
+      } else {
+        const oldFolderPath = Slash(Path.join(folder, item.name));
+        const newFolderPath = Slash(Path.join(folder, newName));
+        await this._createFolderHandler(newFolderPath);
+        await this._copyMetadata(oldFolderPath, newFolderPath);
+        await this._deleteHandler(folder, item.handle, false);
       }
-    } else {
-      console.log('Folder renaming not implemented yet!');
+    } finally {
+      release();
+    }
+  }
+
+  async moveItem(fromFolder, item, toFolder) {
+    const release = await this.metadataMutex.acquire();
+    try {
+      if (item.handle.length === 128) {
+        const fromFolderMetadata = await this.getFolderMetadata(fromFolder);
+        const toFolderMetadata = await this.getFolderMetadata(toFolder);
+
+        let toMoveMetadata = fromFolderMetadata.metadata.files.filter(
+          (file) => file.versions[0].handle === item.handle
+        );
+
+        if (toMoveMetadata.length === 0) {
+          throw Error(
+            `Couldn't find the handle: ${item.handle} couldn't be found in the folder: ${fromFolder}`
+          );
+        }
+        toMoveMetadata = toMoveMetadata[0];
+
+        toFolderMetadata.metadata.files.push(toMoveMetadata);
+        await this._setMetadata(toFolderMetadata);
+
+        fromFolderMetadata.metadata.files = fromFolderMetadata.metadata.files.filter(
+          (file) => file.versions[0].handle !== item.handle
+        );
+        await this._setMetadata(fromFolderMetadata);
+      } else if (item.handle.length === 64) {
+        const oldFolderPath = Slash(Path.join(fromFolder, item.name));
+        const newFolderPath = Slash(Path.join(toFolder, item.name));
+        await this._createFolderHandler(newFolderPath);
+        await this._copyMetadata(oldFolderPath, newFolderPath);
+        await this._deleteHandler(fromFolder, item.handle, false);
+      } else {
+        throw Error("Handle length ain't 128 or 64");
+      }
+    } finally {
+      release();
+    }
+  }
+
+  async _copyMetadata(fromFolder, toFolder) {
+    const fromFolderMetadata = await this.getFolderMetadata(fromFolder);
+
+    if (fromFolderMetadata.metadata.files.length !== 0) {
+      const toFolderMetadata = await this.getFolderMetadata(toFolder);
+      fromFolderMetadata.metadata.files.map((file) =>
+        toFolderMetadata.metadata.files.push(file)
+      );
+      await this._setMetadata(toFolderMetadata);
+    }
+
+    for (const folder of fromFolderMetadata.metadata.folders) {
+      const oldFolderPath = Slash(Path.join(fromFolder, folder.name));
+      const newFolderPath = Slash(Path.join(toFolder, folder.name));
+      await this._createFolderHandler(newFolderPath);
+      await this._copyMetadata(oldFolderPath, newFolderPath);
     }
   }
 }

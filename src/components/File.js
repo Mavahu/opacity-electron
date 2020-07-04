@@ -65,7 +65,9 @@ const File = ({
             <AiOutlineDownload />
           </Button>
           <Button
-            onClick={() => renameFunc(file.versions[0].handle, file.name)}
+            onClick={() =>
+              renameFunc({ handle: file.versions[0].handle, name: file.name })
+            }
           >
             <FiEdit />
           </Button>

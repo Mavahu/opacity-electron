@@ -173,7 +173,7 @@ ipcMain.on('folder:create', async (e, newFolder) => {
 });
 
 ipcMain.on('file:rename', async (e, renameObj) => {
-  await account.rename(renameObj.folder, renameObj.handle, renameObj.newName);
+  await account.rename(renameObj.folder, renameObj.item, renameObj.newName);
   refreshFolder(renameObj.folder);
 });
 

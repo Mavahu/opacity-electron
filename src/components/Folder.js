@@ -8,6 +8,7 @@ import {
   AiOutlineDownload,
   AiOutlineDelete,
 } from 'react-icons/ai';
+import { FiEdit } from 'react-icons/fi';
 import Styled from 'styled-components';
 
 const Checkbox = Styled.input.attrs({
@@ -19,6 +20,7 @@ const Folder = ({
   updatePath,
   downloadFunc,
   deleteFunc,
+  renameFunc,
   changeCheckboxState,
 }) => {
   return (
@@ -47,6 +49,13 @@ const Folder = ({
             }
           >
             <AiOutlineDownload />
+          </Button>
+          <Button
+            onClick={() =>
+              renameFunc({ handle: folder.handle, name: folder.name })
+            }
+          >
+            <FiEdit />
           </Button>
           <Button onClick={() => deleteFunc(folder.handle, folder.name)}>
             <AiOutlineDelete></AiOutlineDelete>
