@@ -177,6 +177,15 @@ ipcMain.on('file:rename', async (e, renameObj) => {
   refreshFolder(renameObj.folder);
 });
 
+ipcMain.on('files:move', async (e, moveObj) => {
+  console.log(moveObj);
+  for (const file of moveObj.files) {
+    if (await account.moveItem(moveObj.fromFolder, file, moveObj.toFolder)) {
+      refreshFolder(moveObj.toFolder);
+    }
+  }
+});
+
 async function setAccount(handle) {
   account = new OpacityAccount(handle);
   await account.checkAccountStatus();

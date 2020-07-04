@@ -816,12 +816,16 @@ class OpacityAccount extends EventEmitter {
           (file) => file.versions[0].handle !== item.handle
         );
         await this._setMetadata(fromFolderMetadata);
+        console.log('Moved item');
+        return true;
       } else if (item.handle.length === 64) {
         const oldFolderPath = Slash(Path.join(fromFolder, item.name));
         const newFolderPath = Slash(Path.join(toFolder, item.name));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
         await this._deleteHandler(fromFolder, item.handle, false);
+        console.log('Moved Folder');
+        return true;
       } else {
         throw Error("Handle length ain't 128 or 64");
       }

@@ -2,8 +2,7 @@ import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
 import slash from 'slash';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
@@ -15,8 +14,6 @@ import File from './File';
 import Folder from './Folder';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -50,9 +47,16 @@ const Manager = () => {
     },
   };
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
-  const [deleteButton, setDeleteButton] = useState(false);
   const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
-  const [downloadButton, setDownloadButton] = useState(false);
+  const [massButtons, setMassButtons] = useState(false);
+  const defaultMoveButton = {
+    move: true,
+    files: [],
+    folder: '',
+  };
+  const [moveButton, setMoveButton] = useState(
+    JSON.parse(JSON.stringify(defaultMoveButton))
+  );
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
@@ -72,8 +76,7 @@ const Manager = () => {
       file.checked = false;
     });
     setMetadata(copyMetadata);
-    setDeleteButton(false);
-    setDownloadButton(false);
+    setMassButtons(false);
     setSelectAllCheckbox(false);
   }
 
@@ -86,12 +89,10 @@ const Manager = () => {
       file.checked = checked;
     });
     if (checked) {
-      setDeleteButton(true);
-      setDownloadButton(true);
+      setMassButtons(true);
       setSelectAllCheckbox(true);
     } else {
-      setDeleteButton(false);
-      setDownloadButton(false);
+      setMassButtons(false);
       setSelectAllCheckbox(false);
     }
     setMetadata(copyMetadata);
@@ -109,11 +110,9 @@ const Manager = () => {
     );
     const checkedFiles = copyMetadata.files.find((file) => file.checked);
     if (checkedFolders || checkedFiles) {
-      setDeleteButton(true);
-      setDownloadButton(true);
+      setMassButtons(true);
     } else {
-      setDeleteButton(false);
-      setDownloadButton(false);
+      setMassButtons(false);
     }
     setMetadata(copyMetadata);
   }
@@ -130,11 +129,9 @@ const Manager = () => {
     );
     const checkedFiles = copyMetadata.files.find((file) => file.checked);
     if (checkedFolders || checkedFiles) {
-      setDeleteButton(true);
-      setDownloadButton(true);
+      setMassButtons(true);
     } else {
-      setDeleteButton(false);
-      setDownloadButton(false);
+      setMassButtons(false);
     }
     setMetadata(copyMetadata);
   }
@@ -163,24 +160,6 @@ const Manager = () => {
       }, 3000);
     });
   }, []);
-
-  const onDrop = useCallback(
-    (f, t, s) => {
-      return;
-      const toUpload = {
-        files: acceptedFiles.map((file) => file.path),
-        folder: folderPath,
-      };
-      ipcRenderer.send('files:upload', toUpload);
-    },
-    [folderPath]
-  );
-
-  const { isDragActive, getRootProps } = useDropzone({
-    onDrop,
-    minSize: 1,
-    multiple: true,
-  });
 
   function updatePath(newPath) {
     const updatedPath = slash(Path.join(folderPath, newPath));
@@ -425,126 +404,172 @@ const Manager = () => {
     await downloadFunc(toDownload);
   }
 
+  async function moveAndDrop(drop = true) {
+    if (moveButton.move) {
+      const filesToMove = [];
+      metadata.folders.map((folder) => {
+        if (folder.checked) {
+          filesToMove.push({ handle: folder.handle, name: folder.name });
+        }
+      });
+      metadata.files.map((file) => {
+        if (file.checked) {
+          filesToMove.push({
+            handle: file.versions[0].handle,
+            name: file.name,
+          });
+        }
+      });
+      setMoveButton({ move: false, folder: folderPath, files: filesToMove });
+      changeAllCheckboxState(false);
+    } else {
+      if (drop && moveButton.folder !== folderPath) {
+        ipcRenderer.send('files:move', {
+          fromFolder: moveButton.folder,
+          files: moveButton.files,
+          toFolder: folderPath,
+        });
+      } else if (!drop) {
+        console.log('Moving cancelled');
+      } else if (moveButton.folder === folderPath) {
+        console.log('Tried to drop into the origin folder');
+      }
+      setMoveButton(JSON.parse(JSON.stringify(defaultMoveButton)));
+    }
+  }
+
   return (
-    <DndProvider backend={HTML5Backend}>
-      <Container fluid {...getRootProps()}>
-        <ButtonToolbar
-          className="justify-content-between"
-          aria-label="Toolbar with Button groups"
-        >
-          <ButtonGroup>
-            {folders.map((folder, index) => {
-              //if (folders.length - 1 != index) {
+    <Container fluid>
+      <ButtonToolbar
+        className="justify-content-between"
+        aria-label="Toolbar with Button groups"
+      >
+        <ButtonGroup>
+          {folders.map((folder, index) => {
+            //if (folders.length - 1 != index) {
+            return (
+              <Card key={index}>
+                <Button onClick={() => goBackTo(index)}>{folder}</Button>
+              </Card>
+            );
+            //}
+          })}
+        </ButtonGroup>
+        <ButtonGroup>
+          <Card>
+            <Button disabled={!massButtons} onClick={() => downloadSelected()}>
+              Download
+            </Button>
+          </Card>
+          <Card>
+            {moveButton.move ? (
+              <Button disabled={!massButtons} onClick={() => moveAndDrop()}>
+                {moveButton.move ? 'Move' : 'Drop'}
+              </Button>
+            ) : (
+              <ButtonGroup>
+                <Button
+                  disabled={moveButton.folder === folderPath}
+                  onClick={() => moveAndDrop()}
+                >
+                  Drop
+                </Button>
+                <Button onClick={() => moveAndDrop(false)}>Cancel</Button>
+              </ButtonGroup>
+            )}
+          </Card>
+          <Card className="mr-1">
+            <Button disabled={!massButtons} onClick={() => deleteSelected()}>
+              Delete
+            </Button>
+          </Card>
+          <Card className="mr-1">
+            <Button onClick={() => newFolder()}>Create Folder</Button>
+          </Card>
+          <Card>
+            <Button onClick={(e) => uploadButton(e, true)}>
+              Upload Folder
+            </Button>
+          </Card>
+          <Card>
+            <Button onClick={uploadButton}>Upload Files</Button>
+          </Card>
+        </ButtonGroup>
+      </ButtonToolbar>
+      <Table size="sm">
+        <thead>
+          <tr>
+            <th>
+              {' '}
+              <Checkbox
+                checked={selectAllCheckbox}
+                onChange={(t) => changeAllCheckboxState(t.target.checked)}
+              />
+            </th>
+            <th></th>
+            <th>
+              <Button variant="outline-secondary" onClick={sortName}>
+                Name
+                {sorts.name.show ? ' ' + sorts.name.icon : ''}
+              </Button>
+            </th>
+            <th>
+              {' '}
+              <Button variant="outline-secondary" onClick={sortCreated}>
+                Created
+                {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
+              </Button>
+            </th>
+            <th>
+              <Button variant="outline-secondary" onClick={sortSize}>
+                Size
+                {sorts.size.show ? ' ' + sorts.size.icon : ''}
+              </Button>
+            </th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {metadata &&
+            metadata.folders.map((folder, index) => {
               return (
-                <Card key={index}>
-                  <Button onClick={() => goBackTo(index)}>{folder}</Button>
-                </Card>
-              );
-              //}
-            })}
-          </ButtonGroup>
-          <ButtonGroup>
-            <Card>
-              <Button
-                disabled={!downloadButton}
-                onClick={() => downloadSelected()}
-              >
-                Download
-              </Button>
-            </Card>
-            <Card className="mr-1">
-              <Button disabled={!deleteButton} onClick={() => deleteSelected()}>
-                Delete
-              </Button>
-            </Card>
-            <Card className="mr-1">
-              <Button onClick={() => newFolder()}>Create Folder</Button>
-            </Card>
-            <Card>
-              <Button onClick={(e) => uploadButton(e, true)}>
-                Upload Folder
-              </Button>
-            </Card>
-            <Card>
-              <Button onClick={uploadButton}>Upload Files</Button>
-            </Card>
-          </ButtonGroup>
-        </ButtonToolbar>
-        <Table size="sm">
-          <thead>
-            <tr>
-              <th>
-                {' '}
-                <Checkbox
-                  checked={selectAllCheckbox}
-                  onChange={(t) => changeAllCheckboxState(t.target.checked)}
+                <Folder
+                  key={index}
+                  folder={folder}
+                  updatePath={updatePath}
+                  downloadFunc={downloadFunc}
+                  deleteFunc={deleteFunc}
+                  renameFunc={renameFunc}
+                  changeCheckboxState={changeFolderCheckboxState}
                 />
-              </th>
-              <th></th>
-              <th>
-                <Button variant="outline-secondary" onClick={sortName}>
-                  Name
-                  {sorts.name.show ? ' ' + sorts.name.icon : ''}
-                </Button>
-              </th>
-              <th>
-                {' '}
-                <Button variant="outline-secondary" onClick={sortCreated}>
-                  Created
-                  {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
-                </Button>
-              </th>
-              <th>
-                <Button variant="outline-secondary" onClick={sortSize}>
-                  Size
-                  {sorts.size.show ? ' ' + sorts.size.icon : ''}
-                </Button>
-              </th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {metadata &&
-              metadata.folders.map((folder, index) => {
-                return (
-                  <Folder
-                    key={index}
-                    folder={folder}
-                    updatePath={updatePath}
-                    downloadFunc={downloadFunc}
-                    deleteFunc={deleteFunc}
-                    renameFunc={renameFunc}
-                    changeCheckboxState={changeFolderCheckboxState}
-                  />
-                );
-              })}
-            {metadata &&
-              metadata.files.map((file, index) => {
-                return (
-                  <File
-                    key={index}
-                    file={file}
-                    deleteFunc={deleteFunc}
-                    downloadFunc={downloadFunc}
-                    renameFunc={renameFunc}
-                    changeCheckboxState={changeFileCheckboxState}
-                  />
-                );
-              })}
-          </tbody>
-        </Table>
-        <ToastContainer
-          position="bottom-right"
-          limit={7}
-          hideProgressBar={false}
-          autoClose={false}
-          newestOnTop={true}
-          closeOnClick={true}
-          draggable={false}
-          rtl={false}
-        />
-      </Container>
-    </DndProvider>
+              );
+            })}
+          {metadata &&
+            metadata.files.map((file, index) => {
+              return (
+                <File
+                  key={index}
+                  file={file}
+                  deleteFunc={deleteFunc}
+                  downloadFunc={downloadFunc}
+                  renameFunc={renameFunc}
+                  changeCheckboxState={changeFileCheckboxState}
+                />
+              );
+            })}
+        </tbody>
+      </Table>
+      <ToastContainer
+        position="bottom-right"
+        limit={7}
+        hideProgressBar={false}
+        autoClose={false}
+        newestOnTop={true}
+        closeOnClick={true}
+        draggable={false}
+        rtl={false}
+      />
+    </Container>
   );
 };
 
