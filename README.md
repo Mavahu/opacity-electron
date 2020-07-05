@@ -1,8 +1,7 @@
 # Opacity Desktop Application
 
 This desktop application allows you to interact with your previously created account from [Opacity](https://www.opacity.io/).
-This application can help you to prevent some issues you may run into, when using the [Opacity](https://www.opacity.io/) website.
-It supports all features and even offers you the possibility to rename folders or move files/folders around.
+It supports all features and even offers you the possibility to rename folders or move files/folders around. Try it out and see it for yourself.
 
 ![](assets/readme-picture.png)
 
@@ -10,7 +9,7 @@ It supports all features and even offers you the possibility to rename folders o
 
 ### Prebuilt binaries
 
-Pick from [here](https://github.com/Mavahu/opacity-electron/releases/tag/v1.0) the right version for your operating system and simply unpack it and you are ready to start the application.
+Download from [here](https://github.com/Mavahu/opacity-electron/releases) the right version for your operating system and simply unpack it and you are ready to start the application.
 
 ### Installation
 
