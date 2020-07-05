@@ -1,76 +1,29 @@
-## Opacity Desktop Application
+# Opacity Desktop Application
 
 This desktop application allows you to interact with your previously created account from [Opacity](https://www.opacity.io/).
+This application can help you to prevent some issues you may run into, when using the [Opacity](https://www.opacity.io/) website.
+It supports all features and even offers you the possibility to rename folders or move files/folders around.
 
-### Install
+(picture)
 
-#### Clone this repo
+## Installation
 
-```
-git clone https://github.com/bradtraversy/simple-electron-react.git
-```
+Pick from here the right version for your operating system and simply unpack it and you are ready to start the application.
 
-#### Install dependencies
+## Feature List
 
-```
-npm install
-```
-
-or
-
-```
-yarn
-```
-
-### Usage
-
-#### Run the app
-
-```
-npm run start
-```
-
-or
-
-```
-yarn start
-```
-
-#### Build the app (automatic)
-
-```
-npm run package
-```
-
-or
-
-```
-yarn package
-```
-
-#### Build the app (manual)
-
-```
-npm run build
-```
-
-or
-
-```
-yarn build
-```
-
-#### Test the app (after `npm run build` || `yarn run build`)
-
-```
-npm run prod
-```
-
-```
-yarn prod
-```
-
-### Change app title
-
-Change the app title in the **webpack.build.config.js** and the **webpack.dev.config.js** files
-"# opacity-electron"
+- [x] Basic browsing UI
+- [x] File/Folder upload
+- [x] File/Folder download
+- [x] File/Folder deletion
+- [x] File/Folder rename
+- [x] File/Folder moving
+- [x] Folder creation
+- [x] Sharelink creation
+- [x] Handle saving/resetting
+- [x] Files sorting
+- [ ] Drag and drop files
+- [ ] Upload/Download settings
+- [ ] Implement account-handle check
+- [ ] Account informations
+- [ ] Batch requests
