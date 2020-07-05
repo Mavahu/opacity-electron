@@ -178,7 +178,6 @@ ipcMain.on('file:rename', async (e, renameObj) => {
 });
 
 ipcMain.on('files:move', async (e, moveObj) => {
-  console.log(moveObj);
   for (const file of moveObj.files) {
     if (await account.moveItem(moveObj.fromFolder, file, moveObj.toFolder)) {
       refreshFolder(moveObj.toFolder);
