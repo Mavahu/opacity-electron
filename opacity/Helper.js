@@ -84,10 +84,10 @@ class Helper {
     const blockSize = fileMetaoptions.blockSize;
     const partSize = fileMetaoptions.partSize;
     const chunkSize = blockSize + Constants.BLOCK_OVERHEAD; //BLOCK_OVERHEAD = TAG_BYTE_LENGTH + IV_BYTE_LENGTH
-    const chunkCount = Math.floor(uploadSize / chunkSize) + 1;
-    const chunksPerPart = Math.floor(partSize / chunkSize) + 1;
+    const chunkCount = Math.ceil(uploadSize / chunkSize);
+    const chunksPerPart = Math.ceil(partSize / chunkSize);
 
-    const endIndex = Math.floor(chunkCount / chunksPerPart) + 1;
+    const endIndex = Math.ceil(chunkCount / chunksPerPart);
 
     return endIndex;
   }
