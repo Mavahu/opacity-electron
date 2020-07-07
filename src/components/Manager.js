@@ -1,7 +1,7 @@
 import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
-import slash from 'slash';
+import {} from './Temp';
 import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
@@ -162,7 +162,7 @@ const Manager = () => {
   }, []);
 
   function updatePath(newPath) {
-    const updatedPath = slash(Path.join(folderPath, newPath));
+    const updatedPath = Utils.getSlash(Path.join(folderPath, newPath));
     setFolderPath(updatedPath);
     ipcRenderer.send('path:update', updatedPath);
     setFolders([...folders, newPath]);
@@ -173,7 +173,7 @@ const Manager = () => {
     setFolders(newPath);
     let traversedPath = [...newPath];
     traversedPath[0] = '/';
-    traversedPath = slash(Path.join(...traversedPath));
+    traversedPath = Utils.getSlash(Path.join(...traversedPath));
     setFolderPath(traversedPath);
     ipcRenderer.send('path:update', traversedPath);
   }

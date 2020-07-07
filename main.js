@@ -1,5 +1,5 @@
 const Path = require('path');
-const Slash = require('slash');
+const Utils = require('./opacity/Utils');
 let sleep = require('util').promisify(setTimeout);
 const url = require('url');
 const keytar = require('keytar');
@@ -164,7 +164,7 @@ ipcMain.on('files:download', async (e, toDownload) => {
 });
 
 ipcMain.on('folder:create', async (e, newFolder) => {
-  const folderPath = Slash(
+  const folderPath = Utils.getSlash(
     Path.join(newFolder.parentFolder, newFolder.folderName)
   );
   if (await account.createFolder(folderPath)) {

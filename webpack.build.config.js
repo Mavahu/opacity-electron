@@ -46,5 +46,9 @@ module.exports = {
     children: false,
     chunks: false,
     modules: false,
+    errors: true,
+    errorDetails: true,
+    logging: true,
+    loggingDebug: true,
   },
 };

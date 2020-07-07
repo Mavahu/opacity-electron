@@ -17,9 +17,9 @@
   "scripts": {
     "prod": "cross-env NODE_ENV=production webpack --mode production --config webpack.build.config.js && electron --noDevServer .",
     "start": "cross-env NODE_ENV=development webpack-dev-server --hot --host 0.0.0.0 --config=./webpack.dev.config.js --mode development",
-    "build": "cross-env NODE_ENV=production webpack --config webpack.build.config.js --mode production",
+    "build": "cross-env NODE_ENV=production webpack --config webpack.build.config.js --mode production --display-error-details",
     "package": "npm run build",
-    "postpackage": "electron-packager ./ --out=./release-builds --overwrite"
+    "postpackage": "electron-packager ./ --out=./release-builds --overwrite --icon=assets/icons/win/logo.ico"
   },
   "dependencies": {
     "aes-256-gcm": "^1.0.3",
@@ -32,6 +32,7 @@
     "core-js": "^3.6.5",
     "eth-crypto": "^1.6.0",
     "filesize": "^6.1.0",
+    "keccak256": "^1.0.0",
     "keytar": "^6.0.1",
     "moment": "^2.26.0",
     "react": "^16.13.1",
@@ -41,7 +42,6 @@
     "react-moment": "^0.9.7",
     "react-router-dom": "^5.2.0",
     "react-toastify": "^6.0.5",
-    "slash": "^3.0.0",
     "styled-components": "^5.1.1",
     "sweetalert2": "^9.15.1",
     "sweetalert2-react-content": "^3.0.1",
