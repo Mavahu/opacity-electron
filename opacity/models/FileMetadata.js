@@ -1,4 +1,4 @@
-const Constants = require('./Constants');
+import Constants from "./Constants";
 
 class FileMetaoptions {
   constructor() {
@@ -19,4 +19,4 @@ class FileMetadata {
   }
 }
 
-module.exports = FileMetadata;
+export default FileMetadata

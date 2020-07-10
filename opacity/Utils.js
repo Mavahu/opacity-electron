@@ -1,16 +1,16 @@
-const Aes = require('aes-256-gcm');
-const Constants = require('./models/Constants');
-const BinaryFile = require('binary-file');
-const Crypto = require('crypto');
+import Constants from "./models/Constants";
+import * as Aes from 'aes-256-gcm';
+import BinaryFile from 'binary-file';
+import Crypto from "crypto"
 import keccak256 from 'keccak256';
 
 export function getFolderHDKey(key, folder) {
-  return Utils.generateSubHDKey(key, 'folder: ' + folder);
+  return generateSubHDKey(key, 'folder: ' + folder);
 }
 
 export function generateSubHDKey(key, pathString) {
   const hashedPath = keccak256(pathString).toString('hex');
-  const bipPath = Utils.hashToPath(hashedPath);
+  const bipPath = hashToPath(hashedPath);
 
   const derivedKey = key.derivePath(bipPath);
   return derivedKey;

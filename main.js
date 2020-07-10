@@ -1,12 +1,10 @@
+require = require('esm')(module);
 const Path = require('path');
 const Utils = require('./opacity/Utils');
-let sleep = require('util').promisify(setTimeout);
 const url = require('url');
 const keytar = require('keytar');
-const { app, BrowserWindow, ipcMain, Menu, webContents } = require('electron');
-const { useHistory } = require('react-router-dom');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
-const { toast } = require('react-toastify');
 
 let mainWindow;
 let account;

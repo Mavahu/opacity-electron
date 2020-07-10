@@ -1,12 +1,10 @@
 import React from 'react';
-import { toast } from 'react-toastify';
 import Moment from 'react-moment';
 import Filesize from 'filesize';
-import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import Swal from 'sweetalert2';
-const Clipboardy = require('clipboardy');
+import * as Clipboardy from 'clipboardy';
 import {
   AiOutlineFile,
   AiOutlineDownload,

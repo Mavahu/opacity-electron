@@ -1,7 +1,7 @@
 import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
-import {} from './Temp';
+import * as Utils from './../../opacity/Utils';
 import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';

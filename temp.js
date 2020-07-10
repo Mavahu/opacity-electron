@@ -1,3 +1,4 @@
+require = require("esm")(module/*, options*/)
 const Opacity = require('./opacity/OpacityAccount');
 
 (async() => {
@@ -5,7 +6,8 @@ const Opacity = require('./opacity/OpacityAccount');
 
     const opqAccount = new Opacity(handle);
 
-    await opqAccount.createFolder("/bbabasdfadsö1")
+    const t = await opqAccount.getFolderMetadata("/")
 
-    console.table(t);
+    await opqAccount.upload("/", "C:\\Users\\Martin\\Downloads\\Silicon Valley S06E05d.mp4")
+    //console.table(t);
 })();
