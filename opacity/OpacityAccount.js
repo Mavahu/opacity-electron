@@ -826,13 +826,13 @@ class OpacityAccount extends EventEmitter {
         this.emit(`move:finished:${item.handle}`);
         return true;
       } else if (item.handle.length === 64) {
+        const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
         if (
-          fromFolder + item.name ===
-          toFolder.slice(0, fromFolder.length + item.name.length)
+            oldFolderPath ===
+          toFolder.slice(0, oldFolderPath.length)
         ) {
           throw Error(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
         }
-        const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
         const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
