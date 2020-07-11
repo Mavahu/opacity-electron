@@ -1,24 +1,23 @@
-let Bip32 = require('bip32');
-const Axios = require('axios');
-const EthCrypto = require('eth-crypto');
-const AccountStatus = require('./models/AccountStatus');
-const {
+import * as Bip32 from 'bip32';
+import Axios from 'axios';
+import * as EthCrypto from 'eth-crypto';
+import AccountStatus from './models/AccountStatus';
+import {
   FolderMetadata,
   FolderMetadataFolder,
   FolderMetadataFile,
   FolderMetadataFileVersion,
-} = require('./models/FolderMetadata');
-const FileMetadata = require('./models/FileMetadata');
-const Constants = require('./models/Constants');
-const Helper = require('./Helper');
-const BinaryFile = require('binary-file');
-const Path = require('path');
-const Slash = require('slash');
-const Fs = require('fs');
-const Crypto = require('crypto');
-const FormData = require('form-data');
-const { EventEmitter } = require('events');
-const { Semaphore, Mutex } = require('async-mutex');
+} from './models/FolderMetadata';
+import FileMetadata from './models/FileMetadata';
+import Constants from './models/Constants';
+import * as Utils from './Utils';
+import BinaryFile from 'binary-file';
+import Path from 'path';
+import Fs from 'fs';
+import Crypto from 'crypto';
+import FormData from 'form-data';
+import { EventEmitter } from 'events';
+import { Semaphore, Mutex } from 'async-mutex';
 
 class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
@@ -122,7 +121,7 @@ class OpacityAccount extends EventEmitter {
     );
     const encryptedMetadata = Buffer.from(response.data.metadata, 'base64');
 
-    const decrypted = Helper.decrypt(
+    const decrypted = Utils.decrypt(
       encryptedMetadata,
       Buffer.from(keyString, 'hex')
     );
@@ -176,7 +175,9 @@ class OpacityAccount extends EventEmitter {
       const folderToDelete = metadata.metadata.folders.find(
         (folder) => folder.handle === handle
       );
-      const newFolderPath = Slash(Path.join(folder, folderToDelete.name));
+      const newFolderPath = Utils.getSlash(
+        Path.join(folder, folderToDelete.name)
+      );
 
       const folderToDeleteMetadata = await this.getFolderMetadata(
         newFolderPath
@@ -227,7 +228,7 @@ class OpacityAccount extends EventEmitter {
 
     const folderMetadataString = metadata.metadata.toString();
 
-    const encryptedFolderMetadata = Helper.encrypt(
+    const encryptedFolderMetadata = Utils.encrypt(
       folderMetadataString,
       Buffer.from(keyString, 'hex')
     );
@@ -274,7 +275,7 @@ class OpacityAccount extends EventEmitter {
 
   async _uploadFolder(folder, folderPath) {
     const folderName = Path.basename(folderPath);
-    const finalPath = Slash(Path.join(folder, folderName));
+    const finalPath = Utils.getSlash(Path.join(folder, folderName));
 
     const response = await this.createFolder(finalPath);
 
@@ -306,14 +307,14 @@ class OpacityAccount extends EventEmitter {
       }
       console.log(`Uploading file: ${fileData.name}`);
       const fileMetaData = FileMetadata.toObject(fileData);
-      const uploadSize = Helper.getUploadSize(fileMetaData.size);
-      const endIndex = Helper.getEndIndex(uploadSize, fileMetaData.p);
+      const uploadSize = Utils.getUploadSize(fileMetaData.size);
+      const endIndex = Utils.getEndIndex(uploadSize, fileMetaData.p);
 
       const handle = Crypto.randomBytes(64);
       const keyBytes = handle.slice(32, 64);
 
       const fileMetadataJson = JSON.stringify(fileMetaData);
-      const encryptedFileMetadataJson = Helper.encrypt(
+      const encryptedFileMetadataJson = Utils.encrypt(
         fileMetadataJson,
         keyBytes
       );
@@ -447,7 +448,7 @@ class OpacityAccount extends EventEmitter {
       const fileId = handle.slice(0, 32).toString('hex');
       const keyBytes = handle.slice(32, 64);
 
-      const rawpart = await Helper.getPartial(
+      const rawpart = await Utils.getPartial(
         fileData,
         fileMetadata.p.partSize,
         currentIndex
@@ -466,7 +467,7 @@ class OpacityAccount extends EventEmitter {
           chunkIndex * fileMetadata.p.blockSize,
           chunkIndex * fileMetadata.p.blockSize + chunkSize
         );
-        const encryptedChunk = Helper.encrypt(chunk, keyBytes);
+        const encryptedChunk = Utils.encrypt(chunk, keyBytes);
         encryptedData = Buffer.concat([encryptedData, encryptedChunk]);
       }
 
@@ -526,22 +527,22 @@ class OpacityAccount extends EventEmitter {
     });
 
     const encryptedMetadata = response.data;
-    const decryptedMetadata = Helper.decrypt(encryptedMetadata, fileKey);
+    const decryptedMetadata = Utils.decrypt(encryptedMetadata, fileKey);
     const decryptedMetadataJson = JSON.parse(decryptedMetadata);
-    const fileMetaoptions = FileMetadata.toObject(decryptedMetadataJson);
+    const fileMetadata = FileMetadata.toObject(decryptedMetadataJson);
 
     this.emit('download:init', {
       handle: handle,
-      fileName: fileMetaoptions.name,
+      fileName: fileMetadata.name,
     });
 
-    const uploadSize = Helper.getUploadSize(fileMetaoptions.size);
+    const uploadSize = Utils.getUploadSize(fileMetadata.size);
     const partSize = 5245440; // 80 * (Constants.DEFAULT_BLOCK_SIZE + Constants.BLOCK_OVERHEAD)
     const parts = Math.floor(uploadSize / partSize) + 1;
 
     const fileWithoutExtension = Path.basename(
-      fileMetaoptions.name,
-      Path.extname(fileMetaoptions.name)
+      fileMetadata.name,
+      Path.extname(fileMetadata.name)
     );
     const folderPath = Path.join(savingPath, 'tmp', fileWithoutExtension);
     if (!Fs.existsSync(folderPath)) {
@@ -549,7 +550,7 @@ class OpacityAccount extends EventEmitter {
     }
 
     // Download all parts
-    console.log(`Downloading file: ${fileMetaoptions.name}`);
+    console.log(`Downloading file: ${fileMetadata.name}`);
     const fileDownloadUrl = downloadUrl + '/file';
 
     const promises = [];
@@ -574,10 +575,10 @@ class OpacityAccount extends EventEmitter {
 
     // Reconstruct file out of the parts
     console.log('Reconstructing');
-    const chunkSize = fileMetaoptions.p.blockSize + Constants.BLOCK_OVERHEAD;
+    const chunkSize = fileMetadata.p.blockSize + Constants.BLOCK_OVERHEAD;
     const chunksAmount = Math.floor(uploadSize / chunkSize) + 1;
 
-    const savePath = Path.join(savingPath, fileMetaoptions.name);
+    const savePath = Path.join(savingPath, fileMetadata.name);
 
     if (Fs.existsSync(savePath)) {
       Fs.unlinkSync(savePath);
@@ -605,7 +606,7 @@ class OpacityAccount extends EventEmitter {
       } catch (e) {
         console.log(e);
       }
-      const decryptedChunk = Helper.decryptFileChunk(chunkRawBytes, fileKey);
+      const decryptedChunk = Utils.decryptFileChunk(chunkRawBytes, fileKey);
       await outputFile.write(decryptedChunk);
       // Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
 
@@ -627,7 +628,7 @@ class OpacityAccount extends EventEmitter {
     }
 
     this.emit(`download:finished:${handle}`);
-    console.log(`Finished download of ${fileMetaoptions.name}`);
+    console.log(`Finished download of ${fileMetadata.name}`);
   }
 
   async _downloadPart(
@@ -675,7 +676,9 @@ class OpacityAccount extends EventEmitter {
       console.log('Folder exists already');
     }
 
-    const opacityPath = Slash(Path.join(opacityFolder, folderToDownload));
+    const opacityPath = Utils.getSlash(
+      Path.join(opacityFolder, folderToDownload)
+    );
     const newMetadata = (await this.getFolderMetadata(opacityPath)).metadata;
 
     for (const folder of newMetadata.folders) {
@@ -759,9 +762,9 @@ class OpacityAccount extends EventEmitter {
   }
 
   _createMetadataKeyAndKeyString(folder) {
-    const folderKey = Helper.getFolderHDKey(this.masterKey, folder);
-    const hashedFolderKey = Helper.generateHashedFolderKey(folderKey);
-    const keyString = Helper.generateFolderKeystring(folderKey);
+    const folderKey = Utils.getFolderHDKey(this.masterKey, folder);
+    const hashedFolderKey = Utils.generateHashedFolderKey(folderKey);
+    const keyString = Utils.generateFolderKeystring(folderKey);
 
     return { hashedFolderKey: hashedFolderKey, keyString: keyString };
   }
@@ -780,8 +783,8 @@ class OpacityAccount extends EventEmitter {
         await this._setMetadata(metadata);
         console.log(`Successfully renamed ${item.name} into ${newName}`);
       } else {
-        const oldFolderPath = Slash(Path.join(folder, item.name));
-        const newFolderPath = Slash(Path.join(folder, newName));
+        const oldFolderPath = Utils.getSlash(Path.join(folder, item.name));
+        const newFolderPath = Utils.getSlash(Path.join(folder, newName));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
         await this._deleteHandler(folder, item.handle, false);
@@ -793,6 +796,7 @@ class OpacityAccount extends EventEmitter {
 
   async moveItem(fromFolder, item, toFolder) {
     const release = await this.metadataMutex.acquire();
+    this.emit('move:init', { fileName: item.name, handle: item.handle });
     try {
       if (item.handle.length === 128) {
         const fromFolderMetadata = await this.getFolderMetadata(fromFolder);
@@ -819,24 +823,32 @@ class OpacityAccount extends EventEmitter {
         console.log(
           `Moved file: ${item.name} from ${fromFolder} to ${toFolder}`
         );
+        this.emit(`move:finished:${item.handle}`);
         return true;
       } else if (item.handle.length === 64) {
-        if (fromFolder === toFolder.slice(0, fromFolder.length)) {
-          console.log(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
-          return false;
+        const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
+        if (
+            oldFolderPath ===
+          toFolder.slice(0, oldFolderPath.length)
+        ) {
+          throw Error(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
         }
-        const oldFolderPath = Slash(Path.join(fromFolder, item.name));
-        const newFolderPath = Slash(Path.join(toFolder, item.name));
+        const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
         await this._deleteHandler(fromFolder, item.handle, false);
         console.log(
           `Moved folder: ${item.name} from ${fromFolder} to ${toFolder}`
         );
+        this.emit(`move:finished:${item.handle}`);
         return true;
       } else {
-        throw Error("Handle length ain't 128 or 64");
+        throw Error("Handle length ain't equal to 128 or 64");
       }
+    } catch (e) {
+      console.log(e);
+      this.emit(`move:failed:${item.handle}`, e.message);
+      return false;
     } finally {
       release();
     }
@@ -854,8 +866,8 @@ class OpacityAccount extends EventEmitter {
     }
 
     for (const folder of fromFolderMetadata.metadata.folders) {
-      const oldFolderPath = Slash(Path.join(fromFolder, folder.name));
-      const newFolderPath = Slash(Path.join(toFolder, folder.name));
+      const oldFolderPath = Utils.getSlash(Path.join(fromFolder, folder.name));
+      const newFolderPath = Utils.getSlash(Path.join(toFolder, folder.name));
       await this._createFolderHandler(newFolderPath);
       await this._copyMetadata(oldFolderPath, newFolderPath);
     }

@@ -1,12 +1,10 @@
+require = require('esm')(module);
 const Path = require('path');
-const Slash = require('slash');
-let sleep = require('util').promisify(setTimeout);
+const Utils = require('./opacity/Utils');
 const url = require('url');
 const keytar = require('keytar');
-const { app, BrowserWindow, ipcMain, Menu, webContents } = require('electron');
-const { useHistory } = require('react-router-dom');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
-const { toast } = require('react-toastify');
 
 let mainWindow;
 let account;
@@ -164,7 +162,7 @@ ipcMain.on('files:download', async (e, toDownload) => {
 });
 
 ipcMain.on('folder:create', async (e, newFolder) => {
-  const folderPath = Slash(
+  const folderPath = Utils.getSlash(
     Path.join(newFolder.parentFolder, newFolder.folderName)
   );
   if (await account.createFolder(folderPath)) {
@@ -251,6 +249,33 @@ async function setAccount(handle) {
       });
 
       account.removeAllListeners(`delete:finished:${file.handle}`);
+    });
+  });
+
+  account.on(`move:init`, (file) => {
+    mainWindow.webContents.send('toast:create', {
+      text: `Moving: ${file.fileName}`,
+      toastId: file.handle,
+    });
+
+    account.on(`move:failed:${file.handle}`, (failMessage) => {
+      mainWindow.webContents.send('toast:finished', {
+        text: `Failed to move: ${file.fileName}\n${failMessage}`,
+        toastId: file.handle,
+      });
+
+      account.removeAllListeners(`move:finished:${file.handle}`);
+      account.removeAllListeners(`move:failed:${file.handle}`);
+    });
+
+    account.on(`move:finished:${file.handle}`, () => {
+      mainWindow.webContents.send('toast:finished', {
+        text: `Moved ${file.fileName}`,
+        toastId: file.handle,
+      });
+
+      account.removeAllListeners(`move:finished:${file.handle}`);
+      account.removeAllListeners(`move:failed:${file.handle}`);
     });
   });
 }

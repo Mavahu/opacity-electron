@@ -28,4 +28,4 @@ class AccountStatus {
   }
 }
 
-module.exports = AccountStatus;
+export default AccountStatus

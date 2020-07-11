@@ -118,9 +118,9 @@ class FolderMetadata {
   }
 }
 
-module.exports = {
+export {
   FolderMetadata,
   FolderMetadataFolder,
   FolderMetadataFile,
-  FolderMetadataFileVersion,
-};
+  FolderMetadataFileVersion
+}
