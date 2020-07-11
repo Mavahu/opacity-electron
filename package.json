@@ -1,7 +1,7 @@
 {
   "name": "opacity-electron",
   "productName": "OpacityApp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop Application for the Opacity cloud",
   "author": "Martin V. Hubert",
   "license": "MIT",

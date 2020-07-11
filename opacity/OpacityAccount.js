@@ -1,22 +1,22 @@
-import * as Bip32 from "bip32"
-import Axios from "axios";
+import * as Bip32 from 'bip32';
+import Axios from 'axios';
 import * as EthCrypto from 'eth-crypto';
-import AccountStatus from "./models/AccountStatus";
+import AccountStatus from './models/AccountStatus';
 import {
   FolderMetadata,
   FolderMetadataFolder,
   FolderMetadataFile,
   FolderMetadataFileVersion,
 } from './models/FolderMetadata';
-import FileMetadata from "./models/FileMetadata";
-import Constants from "./models/Constants";
+import FileMetadata from './models/FileMetadata';
+import Constants from './models/Constants';
 import * as Utils from './Utils';
-import BinaryFile from "binary-file"
-import Path from "path"
-import Fs from "fs"
-import Crypto from "crypto"
-import FormData from "form-data"
-import { EventEmitter } from "events"
+import BinaryFile from 'binary-file';
+import Path from 'path';
+import Fs from 'fs';
+import Crypto from 'crypto';
+import FormData from 'form-data';
+import { EventEmitter } from 'events';
 import { Semaphore, Mutex } from 'async-mutex';
 
 class OpacityAccount extends EventEmitter {
@@ -121,7 +121,10 @@ class OpacityAccount extends EventEmitter {
     );
     const encryptedMetadata = Buffer.from(response.data.metadata, 'base64');
 
-    const decrypted = Utils.decrypt(encryptedMetadata, Buffer.from(keyString, 'hex'));
+    const decrypted = Utils.decrypt(
+      encryptedMetadata,
+      Buffer.from(keyString, 'hex')
+    );
     const decryptedJson = JSON.parse(decrypted);
 
     return FolderMetadata.toObject(decryptedJson);
@@ -538,7 +541,7 @@ class OpacityAccount extends EventEmitter {
     const parts = Math.floor(uploadSize / partSize) + 1;
 
     const fileWithoutExtension = Path.basename(
-        fileMetadata.name,
+      fileMetadata.name,
       Path.extname(fileMetadata.name)
     );
     const folderPath = Path.join(savingPath, 'tmp', fileWithoutExtension);
@@ -793,6 +796,7 @@ class OpacityAccount extends EventEmitter {
 
   async moveItem(fromFolder, item, toFolder) {
     const release = await this.metadataMutex.acquire();
+    this.emit('move:init', { fileName: item.name, handle: item.handle });
     try {
       if (item.handle.length === 128) {
         const fromFolderMetadata = await this.getFolderMetadata(fromFolder);
@@ -819,11 +823,14 @@ class OpacityAccount extends EventEmitter {
         console.log(
           `Moved file: ${item.name} from ${fromFolder} to ${toFolder}`
         );
+        this.emit(`move:finished:${item.handle}`);
         return true;
       } else if (item.handle.length === 64) {
-        if (fromFolder === toFolder.slice(0, fromFolder.length)) {
-          console.log(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
-          return false;
+        if (
+          fromFolder + item.name ===
+          toFolder.slice(0, fromFolder.length + item.name.length)
+        ) {
+          throw Error(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
         }
         const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
         const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));
@@ -833,10 +840,15 @@ class OpacityAccount extends EventEmitter {
         console.log(
           `Moved folder: ${item.name} from ${fromFolder} to ${toFolder}`
         );
+        this.emit(`move:finished:${item.handle}`);
         return true;
       } else {
-        throw Error("Handle length ain't 128 or 64");
+        throw Error("Handle length ain't equal to 128 or 64");
       }
+    } catch (e) {
+      console.log(e);
+      this.emit(`move:failed:${item.handle}`, e.message);
+      return false;
     } finally {
       release();
     }

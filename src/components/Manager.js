@@ -464,7 +464,7 @@ const Manager = () => {
           <Card>
             {moveButton.move ? (
               <Button disabled={!massButtons} onClick={() => moveAndDrop()}>
-                {moveButton.move ? 'Move' : 'Drop'}
+                Cut
               </Button>
             ) : (
               <ButtonGroup>
@@ -472,7 +472,7 @@ const Manager = () => {
                   disabled={moveButton.folder === folderPath}
                   onClick={() => moveAndDrop()}
                 >
-                  Drop
+                  Paste
                 </Button>
                 <Button onClick={() => moveAndDrop(false)}>Cancel</Button>
               </ButtonGroup>
