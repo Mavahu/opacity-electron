@@ -12,6 +12,7 @@ import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import Card from 'react-bootstrap/Card';
 import File from './File';
 import Folder from './Folder';
+import DragAndDropzone from './DragAndDropzone';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
 
@@ -437,47 +438,9 @@ const Manager = () => {
       setCutButton(JSON.parse(JSON.stringify(defaultCutButton)));
     }
   }
-  function handleDrag(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  function handleDragIn(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  function handleDragOut(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  function handleDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log(e.dataTransfer.files);
-    const files = [];
-    e.dataTransfer.files.forEach((file) => files.push(file.path));
-    ipcRenderer.send('files:upload', {
-      folder: folderPath,
-      files: files,
-    });
-  }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        padding: 0,
-        margin: 0,
-        top: 0,
-        left: 0,
-        height: '100%',
-        width: '100%',
-      }}
-      className={'drag-drop-zone'}
-      onDrop={(e) => handleDrop(e)}
-      onDragOver={(e) => handleDrag(e)}
-      onDragEnter={(e) => handleDragIn(e)}
-      onDragLeave={(e) => handleDragOut(e)}
-    >
+    <DragAndDropzone folderPath={folderPath}>
       <Container fluid>
         <ButtonToolbar
           className="justify-content-between"
@@ -612,7 +575,7 @@ const Manager = () => {
           rtl={false}
         />
       </Container>
-    </div>
+    </DragAndDropzone>
   );
 };
 
