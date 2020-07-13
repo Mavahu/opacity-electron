@@ -5,6 +5,7 @@ const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
+const openAboutWindow = require('about-window').default;
 
 let mainWindow;
 let account;
@@ -72,14 +73,25 @@ function createMainWindow() {
 
 app.on('ready', () => {
   createMainWindow();
-
   const mainMenu = Menu.buildFromTemplate(menu);
   Menu.setApplicationMenu(mainMenu);
 });
 
 const menu = [
   ...(isMac ? [{ role: 'appMenu' }] : []),
-  { role: 'fileMenu' },
+  {
+    label: app.name,
+    submenu: [
+      {
+        label: 'About',
+        click: () =>
+          openAboutWindow({
+            icon_path: `${__dirname}/assets/icons/logo.png`,
+          }),
+      },
+      isMac ? { role: 'close' } : { role: 'quit' },
+    ],
+  },
   {
     label: 'Handle',
     submenu: [{ label: 'Reset Handle', click: () => resetHandle() }],

@@ -1,11 +1,16 @@
 import { ipcRenderer } from 'electron';
 import React from 'react';
 
+/*
+  Handles all the dropped files/folders into the application.
+  Gets the path of the files and sends them to the main thread to upload them.
+*/
 class DragAndDropzone extends React.Component {
   constructor(props) {
     super(props);
   }
 
+  // From here
   handleDrag(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -18,6 +23,9 @@ class DragAndDropzone extends React.Component {
     e.preventDefault();
     e.stopPropagation();
   }
+  // till here these functions are needed to initialize,
+  // otherwise the dropzone isn't functional
+
   handleDrop(e) {
     e.preventDefault();
     e.stopPropagation();

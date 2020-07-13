@@ -15,6 +15,7 @@ import Folder from './Folder';
 import DragAndDropzone from './DragAndDropzone';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
+import ActionButtons from './ActionButtons';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -22,6 +23,7 @@ const Checkbox = Styled.input.attrs({
 
 const Manager = () => {
   const [folderPath, setFolderPath] = useState('/');
+  //reference needed to use folderPath in useEffect
   const refFolderPath = useRef(folderPath);
   refFolderPath.current = folderPath;
   const [folders, setFolders] = useState(['All Files']);
@@ -50,14 +52,6 @@ const Manager = () => {
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
   const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
   const [massButtons, setMassButtons] = useState(false);
-  const defaultCutButton = {
-    cut: true,
-    files: [],
-    folder: '',
-  };
-  const [cutButton, setCutButton] = useState(
-    JSON.parse(JSON.stringify(defaultCutButton))
-  );
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
@@ -202,27 +196,6 @@ const Manager = () => {
     }
   }
 
-  function uploadButton(e, isFolder = false) {
-    dialog
-      .showOpenDialog({
-        properties: [
-          isFolder ? 'openDirectory' : 'openFile',
-          'multiSelections',
-        ],
-      })
-      .then((result) => {
-        if (!result.canceled) {
-          ipcRenderer.send('files:upload', {
-            folder: folderPath,
-            files: result.filePaths,
-          });
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  }
-
   async function downloadFunc(item) {
     dialog
       .showOpenDialog({
@@ -240,28 +213,6 @@ const Manager = () => {
       .catch((err) => {
         console.log(err);
       });
-  }
-
-  async function newFolder() {
-    const { value: folderName } = await Swal.fire({
-      title: 'Enter the folder name',
-      input: 'text',
-      showCancelButton: true,
-      cancelButtonColor: '#d33',
-      inputValidator: (value) => {
-        if (!value) {
-          return 'You need to write something!';
-        }
-      },
-    });
-
-    if (folderName) {
-      Swal.fire('', '', 'success');
-      ipcRenderer.send('folder:create', {
-        parentFolder: folderPath,
-        folderName: folderName,
-      });
-    }
   }
 
   async function renameFunc(item) {
@@ -352,93 +303,6 @@ const Manager = () => {
     setMetadata(copyMetadata);
   }
 
-  async function deleteSelected() {
-    const checkedFolders = metadata.folders.filter((folder) => folder.checked);
-    const checkedFiles = metadata.files.filter((file) => file.checked);
-    const { value: result } = await Swal.fire({
-      title: 'Are you sure?',
-      html: `You won't be able to revert this!<br/>Folders: ${checkedFolders
-        .map((folder) => '<li>' + folder.name + '</li>')
-        .join('')}<br/>Files: ${checkedFiles
-        .map((file) => '<li>' + file.name + '</li> ')
-        .join('')}`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
-    });
-
-    if (result) {
-      const toDelete = [];
-      checkedFolders.map((folder) =>
-        toDelete.push({
-          folder: folderPath,
-          handle: folder.handle,
-          name: folder.name,
-        })
-      );
-      checkedFiles.map((file) =>
-        toDelete.push({
-          folder: folderPath,
-          handle: file.versions[0].handle,
-          name: file.name,
-        })
-      );
-      ipcRenderer.send('files:delete', toDelete);
-      changeAllCheckboxState(false);
-    }
-  }
-
-  async function downloadSelected() {
-    const toDownload = [];
-    metadata.folders.map((folder) => {
-      if (folder.checked) {
-        toDownload.push({ name: folder.name, handle: folder.handle });
-      }
-    });
-    metadata.files.map((file) => {
-      if (file.checked) {
-        toDownload.push({ name: file.name, handle: file.versions[0].handle });
-      }
-    });
-    await downloadFunc(toDownload);
-  }
-
-  async function cutAndPaste(paste = true) {
-    if (cutButton.cut) {
-      const filesToMove = [];
-      metadata.folders.map((folder) => {
-        if (folder.checked) {
-          filesToMove.push({ handle: folder.handle, name: folder.name });
-        }
-      });
-      metadata.files.map((file) => {
-        if (file.checked) {
-          filesToMove.push({
-            handle: file.versions[0].handle,
-            name: file.name,
-          });
-        }
-      });
-      setCutButton({ cut: false, folder: folderPath, files: filesToMove });
-      changeAllCheckboxState(false);
-    } else {
-      if (paste && cutButton.folder !== folderPath) {
-        ipcRenderer.send('files:move', {
-          fromFolder: cutButton.folder,
-          files: cutButton.files,
-          toFolder: folderPath,
-        });
-      } else if (!paste) {
-        console.log('Moving cancelled');
-      } else if (cutButton.folder === folderPath) {
-        console.log('Tried to drop into the origin folder');
-      }
-      setCutButton(JSON.parse(JSON.stringify(defaultCutButton)));
-    }
-  }
-
   return (
     <DragAndDropzone folderPath={folderPath}>
       <Container fluid>
@@ -457,49 +321,13 @@ const Manager = () => {
               //}
             })}
           </ButtonGroup>
-          <ButtonGroup>
-            <Card>
-              <Button
-                disabled={!massButtons}
-                onClick={() => downloadSelected()}
-              >
-                Download
-              </Button>
-            </Card>
-            <Card>
-              {cutButton.cut ? (
-                <Button disabled={!massButtons} onClick={() => cutAndPaste()}>
-                  Cut
-                </Button>
-              ) : (
-                <ButtonGroup>
-                  <Button
-                    disabled={cutButton.folder === folderPath}
-                    onClick={() => cutAndPaste()}
-                  >
-                    Paste
-                  </Button>
-                  <Button onClick={() => cutAndPaste(false)}>Cancel</Button>
-                </ButtonGroup>
-              )}
-            </Card>
-            <Card className="mr-1">
-              <Button disabled={!massButtons} onClick={() => deleteSelected()}>
-                Delete
-              </Button>
-            </Card>
-            <Card className="mr-1">
-              <Button onClick={() => newFolder()}>Create Folder</Button>
-            </Card>
-            <Card>
-              <Button onClick={(e) => uploadButton(e, true)}>
-                Upload Folder
-              </Button>
-            </Card>
-            <Card>
-              <Button onClick={uploadButton}>Upload Files</Button>
-            </Card>
-          </ButtonGroup>
+          <ActionButtons
+            metadata={metadata}
+            folderPath={folderPath}
+            massButtons={massButtons}
+            downloadFunc={downloadFunc}
+            changeAllCheckboxState={changeAllCheckboxState}
+          ></ActionButtons>
         </ButtonToolbar>
         <Table size="sm">
           <thead>

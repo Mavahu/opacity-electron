@@ -31,6 +31,7 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
+    // downloadMutex 
     this.downloadMutex = new Mutex();
     this.downloadChunksSemaphore = new Semaphore(10);
     this.uploadMutex = new Mutex();

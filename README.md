@@ -37,7 +37,7 @@ $ npm run package
 - [x] Sharelink creation
 - [x] Handle saving/resetting
 - [x] Files sorting
-- [ ] Drag and drop files
+- [x] Drag and drop files/folders
 - [ ] Upload/Download settings
 - [ ] Implement account-handle check
 - [ ] Account informations
