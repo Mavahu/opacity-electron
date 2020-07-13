@@ -13,6 +13,8 @@ import {
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
 import Styled from 'styled-components';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -50,30 +52,50 @@ const File = ({
       <td>{Filesize(file.versions[0].size)}</td>
       <td>
         <ButtonGroup>
-          <Button onClick={() => shareClick(file.versions[0].handle)}>
-            <AiOutlineShareAlt></AiOutlineShareAlt>
-          </Button>
-          <Button
-            onClick={() =>
-              downloadFunc([
-                { handle: file.versions[0].handle, name: file.name },
-              ])
-            }
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Share file</Tooltip>}
           >
-            <AiOutlineDownload />
-          </Button>
-          <Button
-            onClick={() =>
-              renameFunc({ handle: file.versions[0].handle, name: file.name })
-            }
+            <Button onClick={() => shareClick(file.versions[0].handle)}>
+              <AiOutlineShareAlt />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Download file</Tooltip>}
           >
-            <FiEdit />
-          </Button>
-          <Button
-            onClick={() => deleteFunc(file.versions[0].handle, file.name)}
+            <Button
+              onClick={() =>
+                downloadFunc([
+                  { handle: file.versions[0].handle, name: file.name },
+                ])
+              }
+            >
+              <AiOutlineDownload />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Rename file</Tooltip>}
           >
-            <AiOutlineDelete></AiOutlineDelete>
-          </Button>
+            <Button
+              onClick={() =>
+                renameFunc({ handle: file.versions[0].handle, name: file.name })
+              }
+            >
+              <FiEdit />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Delete file</Tooltip>}
+          >
+            <Button
+              onClick={() => deleteFunc(file.versions[0].handle, file.name)}
+            >
+              <AiOutlineDelete />
+            </Button>
+          </OverlayTrigger>
         </ButtonGroup>
       </td>
     </tr>

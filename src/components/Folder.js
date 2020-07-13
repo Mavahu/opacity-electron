@@ -8,6 +8,8 @@ import {
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
 import Styled from 'styled-components';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -41,23 +43,38 @@ const Folder = ({
       <td></td>
       <td>
         <ButtonGroup>
-          <Button
-            onClick={() =>
-              downloadFunc([{ handle: folder.handle, name: folder.name }])
-            }
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Download folder</Tooltip>}
           >
-            <AiOutlineDownload />
-          </Button>
-          <Button
-            onClick={() =>
-              renameFunc({ handle: folder.handle, name: folder.name })
-            }
+            <Button
+              onClick={() =>
+                downloadFunc([{ handle: folder.handle, name: folder.name }])
+              }
+            >
+              <AiOutlineDownload />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Rename folder</Tooltip>}
           >
-            <FiEdit />
-          </Button>
-          <Button onClick={() => deleteFunc(folder.handle, folder.name)}>
-            <AiOutlineDelete></AiOutlineDelete>
-          </Button>
+            <Button
+              onClick={() =>
+                renameFunc({ handle: folder.handle, name: folder.name })
+              }
+            >
+              <FiEdit />
+            </Button>
+          </OverlayTrigger>
+          <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip>Delete folder</Tooltip>}
+          >
+            <Button onClick={() => deleteFunc(folder.handle, folder.name)}>
+              <AiOutlineDelete></AiOutlineDelete>
+            </Button>
+          </OverlayTrigger>
         </ButtonGroup>
       </td>
     </tr>

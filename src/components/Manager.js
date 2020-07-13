@@ -359,7 +359,7 @@ const Manager = () => {
                   {sorts.size.show ? ' ' + sorts.size.icon : ''}
                 </Button>
               </th>
-              <th>Actions</th>
+              <th style={{ fontWeight: 500 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -392,6 +392,24 @@ const Manager = () => {
               })}
           </tbody>
         </Table>
+        {(() => {
+          if (
+            metadata &&
+            metadata.files.length === 0 &&
+            metadata.folders.length === 0
+          )
+            return (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontWeight: 'bold', opacity: 0.8 }}>
+                  There are no items in this folder
+                </p>
+                <p>
+                  Drag files and folders here to upload, or click the upload
+                  button on the top right to browse files from your computer.
+                </p>
+              </div>
+            );
+        })()}
         <ToastContainer
           position="bottom-right"
           limit={7}
