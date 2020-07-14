@@ -9,11 +9,16 @@ const LoginForm = () => {
   const history = useHistory();
   const [handle, setHandle] = useState('');
   const [save, setSave] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     ipcRenderer.send('login:restore');
 
     ipcRenderer.on('login:success', (e) => history.push('manager'));
+
+    ipcRenderer.on('login:failed', (e, message) => {
+      setErrorMessage(message.error);
+    });
   }, []);
 
   const onSubmit = (e) => {
@@ -39,6 +44,17 @@ const LoginForm = () => {
             onChange={(e) => setSave(e.target.value)}
           />
         </Form.Group>
+        {(() => {
+          if (errorMessage)
+            return (
+              <div style={{ textAlign: 'center', color: 'red' }}>
+                <p style={{ fontWeight: 'bold', opacity: 0.8 }}>
+                  Make sure you enter your handle correctly!
+                </p>
+                <p>{errorMessage}</p>
+              </div>
+            );
+        })()}
         <Button variant="primary" type="submit">
           Submit
         </Button>

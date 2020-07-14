@@ -5,7 +5,6 @@ const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
-const openAboutWindow = require('about-window').default;
 
 let mainWindow;
 let account;
@@ -83,18 +82,11 @@ const menu = [
     label: app.name,
     submenu: [
       {
-        label: 'About',
-        click: () =>
-          openAboutWindow({
-            icon_path: `${__dirname}/assets/icons/logo.png`,
-          }),
+        label: 'Reset Handle',
+        click: () => resetHandle(),
       },
       isMac ? { role: 'close' } : { role: 'quit' },
     ],
-  },
-  {
-    label: 'Handle',
-    submenu: [{ label: 'Reset Handle', click: () => resetHandle() }],
   },
   ...(isDev
     ? [
@@ -129,7 +121,12 @@ ipcMain.on('login:restore', async (e) => {
 
 ipcMain.on('handle:set', async (e, handleObject) => {
   try {
+    if (handleObject.handle.length !== 128) {
+      throw Error("Then handle doesn't have the right length of 128 signs.");
+    }
+
     await setAccount(handleObject.handle);
+    await refreshFolder('/');
 
     if (handleObject.saveHandle) {
       // save handle to keyring
@@ -139,7 +136,7 @@ ipcMain.on('handle:set', async (e, handleObject) => {
     mainWindow.webContents.send('login:success');
     refreshFolder('/');
   } catch (err) {
-    console.log(err);
+    mainWindow.webContents.send('login:failed', { error: err.message });
   }
 });
 
@@ -148,7 +145,6 @@ ipcMain.on('path:update', async (e, newPath) => {
 });
 
 ipcMain.on('files:delete', async (e, files) => {
-  console.log('deleting');
   for (const file of files) {
     if (await account.delete(file.folder, file.handle, file.name)) {
       refreshFolder(file.folder);

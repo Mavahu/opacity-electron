@@ -232,7 +232,7 @@ const Manager = () => {
     });
 
     if (newName) {
-      Swal.fire('', '', 'success');
+      Swal.fire('', `Renamed ${item.name} into ${newName}`, 'success');
       ipcRenderer.send('file:rename', {
         folder: folderPath,
         item,
@@ -333,7 +333,6 @@ const Manager = () => {
           <thead>
             <tr>
               <th>
-                {' '}
                 <Checkbox
                   checked={selectAllCheckbox}
                   onChange={(t) => changeAllCheckboxState(t.target.checked)}
@@ -347,7 +346,6 @@ const Manager = () => {
                 </Button>
               </th>
               <th>
-                {' '}
                 <Button variant="outline-secondary" onClick={sortCreated}>
                   Created
                   {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}

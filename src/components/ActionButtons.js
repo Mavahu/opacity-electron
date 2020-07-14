@@ -123,7 +123,7 @@ const ActionButtons = ({
     });
 
     if (folderName) {
-      Swal.fire('', '', 'success');
+      Swal.fire('', `Created folder: ${folderName}`, 'success');
       ipcRenderer.send('folder:create', {
         parentFolder: folderPath,
         folderName: folderName,

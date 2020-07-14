@@ -22,7 +22,6 @@
     "postpackage": "electron-packager ./ --out=./release-builds --overwrite --icon=assets/icons/win/logo.ico"
   },
   "dependencies": {
-    "about-window": "^1.13.4",
     "aes-256-gcm": "^1.0.3",
     "async-mutex": "^0.2.3",
     "axios": "^0.19.2",

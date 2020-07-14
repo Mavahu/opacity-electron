@@ -31,7 +31,7 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
-    // downloadMutex 
+    // downloadMutex
     this.downloadMutex = new Mutex();
     this.downloadChunksSemaphore = new Semaphore(10);
     this.uploadMutex = new Mutex();
@@ -828,10 +828,7 @@ class OpacityAccount extends EventEmitter {
         return true;
       } else if (item.handle.length === 64) {
         const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
-        if (
-            oldFolderPath ===
-          toFolder.slice(0, oldFolderPath.length)
-        ) {
+        if (oldFolderPath === toFolder.slice(0, oldFolderPath.length)) {
           throw Error(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
         }
         const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));
