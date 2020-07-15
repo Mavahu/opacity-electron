@@ -72,17 +72,21 @@ function createMainWindow() {
 
 app.on('ready', () => {
   createMainWindow();
-
   const mainMenu = Menu.buildFromTemplate(menu);
   Menu.setApplicationMenu(mainMenu);
 });
 
 const menu = [
   ...(isMac ? [{ role: 'appMenu' }] : []),
-  { role: 'fileMenu' },
   {
-    label: 'Handle',
-    submenu: [{ label: 'Reset Handle', click: () => resetHandle() }],
+    label: app.name,
+    submenu: [
+      {
+        label: 'Reset Handle',
+        click: () => resetHandle(),
+      },
+      isMac ? { role: 'close' } : { role: 'quit' },
+    ],
   },
   ...(isDev
     ? [
@@ -117,7 +121,14 @@ ipcMain.on('login:restore', async (e) => {
 
 ipcMain.on('handle:set', async (e, handleObject) => {
   try {
+    if (handleObject.handle.length !== 128) {
+      throw Error("Then handle doesn't have the right length of 128 signs.");
+    }
+
     await setAccount(handleObject.handle);
+    // Call this function before saving the handle to see if the entered handle is correct
+    // eg. mixed up letters etc.
+    await refreshFolder('/');
 
     if (handleObject.saveHandle) {
       // save handle to keyring
@@ -127,7 +138,7 @@ ipcMain.on('handle:set', async (e, handleObject) => {
     mainWindow.webContents.send('login:success');
     refreshFolder('/');
   } catch (err) {
-    console.log(err);
+    mainWindow.webContents.send('login:failed', { error: err.message });
   }
 });
 
@@ -136,7 +147,6 @@ ipcMain.on('path:update', async (e, newPath) => {
 });
 
 ipcMain.on('files:delete', async (e, files) => {
-  console.log('deleting');
   for (const file of files) {
     if (await account.delete(file.folder, file.handle, file.name)) {
       refreshFolder(file.folder);

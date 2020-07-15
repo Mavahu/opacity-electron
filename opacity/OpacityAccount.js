@@ -31,6 +31,8 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
+    // donwloadMutex and uploadMutex allow only 1 down- and upload simultaniously
+    // TODO: Change them to semaphores, and add the initiation value to the constructor
     this.downloadMutex = new Mutex();
     this.downloadChunksSemaphore = new Semaphore(10);
     this.uploadMutex = new Mutex();
@@ -98,6 +100,7 @@ class OpacityAccount extends EventEmitter {
       hashedFolderKey,
       keyString
     );
+
     return {
       metadata: fmd,
       hashedFolderKey: hashedFolderKey,
@@ -110,8 +113,8 @@ class OpacityAccount extends EventEmitter {
       timestamp: Date.now(),
       metadataKey: hashedFolderKey,
     };
-    const rawPayloadJson = JSON.stringify(rawPayload);
 
+    const rawPayloadJson = JSON.stringify(rawPayload);
     const payload = this._signPayload(rawPayloadJson);
     const payloadJson = JSON.stringify(payload);
 
@@ -119,8 +122,8 @@ class OpacityAccount extends EventEmitter {
       this.baseUrl + 'metadata/get',
       payloadJson
     );
-    const encryptedMetadata = Buffer.from(response.data.metadata, 'base64');
 
+    const encryptedMetadata = Buffer.from(response.data.metadata, 'base64');
     const decrypted = Utils.decrypt(
       encryptedMetadata,
       Buffer.from(keyString, 'hex')
@@ -211,7 +214,7 @@ class OpacityAccount extends EventEmitter {
         payloadJson
       );
 
-      // Delete the folder now remove the folder from the parent folder
+      // Delete the folder now by removing the folder from the parent folder
 
       const newFolders = metadata.metadata.folders.filter(
         (folder) => folder.handle !== handle
@@ -243,7 +246,6 @@ class OpacityAccount extends EventEmitter {
     };
 
     const rawPayloadJson = JSON.stringify(rawPayload);
-
     const payload = this._signPayload(rawPayloadJson);
     const payloadJson = JSON.stringify(payload);
 
@@ -550,7 +552,7 @@ class OpacityAccount extends EventEmitter {
     }
 
     // Download all parts
-    console.log(`Downloading file: ${fileMetadata.name}`);
+    //console.log(`Downloading file: ${fileMetadata.name}`);
     const fileDownloadUrl = downloadUrl + '/file';
 
     const promises = [];
@@ -571,7 +573,7 @@ class OpacityAccount extends EventEmitter {
         );
       });
     await Promise.allSettled(promises);
-    console.log('Total time: ' + (Date.now() - time) / 1000);
+    //console.log('Total time: ' + (Date.now() - time) / 1000);
 
     // Reconstruct file out of the parts
     console.log('Reconstructing');
@@ -593,7 +595,6 @@ class OpacityAccount extends EventEmitter {
     for (let chunkIndex = 0; chunkIndex < chunksAmount; chunkIndex++) {
       let chunkRawBytes;
       let toReadBytes = chunkSize;
-      //myBinaryFile.seek(seek);
       if (seek + toReadBytes >= Fs.statSync(partPath).size) {
         toReadBytes = Fs.statSync(partPath).size - seek;
         seek = 0;
@@ -608,7 +609,6 @@ class OpacityAccount extends EventEmitter {
       }
       const decryptedChunk = Utils.decryptFileChunk(chunkRawBytes, fileKey);
       await outputFile.write(decryptedChunk);
-      // Fs.appendFileSync(savePath, decryptedChunk, { encoding: 'binary' });
 
       if (seek === 0 && chunkIndex + 1 !== chunksAmount) {
         await myBinaryFile.close();
@@ -827,10 +827,7 @@ class OpacityAccount extends EventEmitter {
         return true;
       } else if (item.handle.length === 64) {
         const oldFolderPath = Utils.getSlash(Path.join(fromFolder, item.name));
-        if (
-            oldFolderPath ===
-          toFolder.slice(0, oldFolderPath.length)
-        ) {
+        if (oldFolderPath === toFolder.slice(0, oldFolderPath.length)) {
           throw Error(`Error: ${fromFolder} is a parent folder of ${toFolder}`);
         }
         const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));

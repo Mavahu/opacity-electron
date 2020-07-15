@@ -1,7 +1,6 @@
 import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
-import * as Utils from './../../opacity/Utils';
 import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
@@ -10,10 +9,13 @@ import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import Card from 'react-bootstrap/Card';
-import File from './File';
-import Folder from './Folder';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
+import * as Utils from './../../opacity/Utils';
+import FileTableItem from './FileTableItem';
+import FolderTableItem from './FolderTableItem';
+import DragAndDropzone from './DragAndDropzone';
+import ActionButtons from './ActionButtons';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
@@ -21,6 +23,7 @@ const Checkbox = Styled.input.attrs({
 
 const Manager = () => {
   const [folderPath, setFolderPath] = useState('/');
+  //reference needed to use folderPath in useEffect
   const refFolderPath = useRef(folderPath);
   refFolderPath.current = folderPath;
   const [folders, setFolders] = useState(['All Files']);
@@ -49,25 +52,17 @@ const Manager = () => {
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
   const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
   const [massButtons, setMassButtons] = useState(false);
-  const defaultMoveButton = {
-    move: true,
-    files: [],
-    folder: '',
-  };
-  const [moveButton, setMoveButton] = useState(
-    JSON.parse(JSON.stringify(defaultMoveButton))
-  );
 
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
       if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
-        addCheckboxValues(newMetadata.metadata);
+        modifyMetadataAndSetIt(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
     });
   }, []);
 
-  function addCheckboxValues(metadata) {
+  function modifyMetadataAndSetIt(metadata) {
     const copyMetadata = JSON.parse(JSON.stringify(metadata));
     copyMetadata.folders.forEach(function (folder) {
       folder.checked = false;
@@ -201,27 +196,6 @@ const Manager = () => {
     }
   }
 
-  function uploadButton(e, isFolder = false) {
-    dialog
-      .showOpenDialog({
-        properties: [
-          isFolder ? 'openDirectory' : 'openFile',
-          'multiSelections',
-        ],
-      })
-      .then((result) => {
-        if (!result.canceled) {
-          ipcRenderer.send('files:upload', {
-            folder: folderPath,
-            files: result.filePaths,
-          });
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  }
-
   async function downloadFunc(item) {
     dialog
       .showOpenDialog({
@@ -241,28 +215,6 @@ const Manager = () => {
       });
   }
 
-  async function newFolder() {
-    const { value: folderName } = await Swal.fire({
-      title: 'Enter the folder name',
-      input: 'text',
-      showCancelButton: true,
-      cancelButtonColor: '#d33',
-      inputValidator: (value) => {
-        if (!value) {
-          return 'You need to write something!';
-        }
-      },
-    });
-
-    if (folderName) {
-      Swal.fire('', '', 'success');
-      ipcRenderer.send('folder:create', {
-        parentFolder: folderPath,
-        folderName: folderName,
-      });
-    }
-  }
-
   async function renameFunc(item) {
     const { value: newName } = await Swal.fire({
       title: 'Enter the a new name',
@@ -280,7 +232,7 @@ const Manager = () => {
     });
 
     if (newName) {
-      Swal.fire('', '', 'success');
+      Swal.fire('', `Renamed ${item.name} into ${newName}`, 'success');
       ipcRenderer.send('file:rename', {
         folder: folderPath,
         item,
@@ -351,225 +303,123 @@ const Manager = () => {
     setMetadata(copyMetadata);
   }
 
-  async function deleteSelected() {
-    const checkedFolders = metadata.folders.filter((folder) => folder.checked);
-    const checkedFiles = metadata.files.filter((file) => file.checked);
-    const { value: result } = await Swal.fire({
-      title: 'Are you sure?',
-      html: `You won't be able to revert this!<br/>Folders: ${checkedFolders
-        .map((folder) => '<li>' + folder.name + '</li>')
-        .join('')}<br/>Files: ${checkedFiles
-        .map((file) => '<li>' + file.name + '</li> ')
-        .join('')}`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
-    });
-
-    if (result) {
-      const toDelete = [];
-      checkedFolders.map((folder) =>
-        toDelete.push({
-          folder: folderPath,
-          handle: folder.handle,
-          name: folder.name,
-        })
-      );
-      checkedFiles.map((file) =>
-        toDelete.push({
-          folder: folderPath,
-          handle: file.versions[0].handle,
-          name: file.name,
-        })
-      );
-      ipcRenderer.send('files:delete', toDelete);
-      changeAllCheckboxState(false);
-    }
-  }
-
-  async function downloadSelected() {
-    const toDownload = [];
-    metadata.folders.map((folder) => {
-      if (folder.checked) {
-        toDownload.push({ name: folder.name, handle: folder.handle });
-      }
-    });
-    metadata.files.map((file) => {
-      if (file.checked) {
-        toDownload.push({ name: file.name, handle: file.versions[0].handle });
-      }
-    });
-    await downloadFunc(toDownload);
-  }
-
-  async function moveAndDrop(drop = true) {
-    if (moveButton.move) {
-      const filesToMove = [];
-      metadata.folders.map((folder) => {
-        if (folder.checked) {
-          filesToMove.push({ handle: folder.handle, name: folder.name });
-        }
-      });
-      metadata.files.map((file) => {
-        if (file.checked) {
-          filesToMove.push({
-            handle: file.versions[0].handle,
-            name: file.name,
-          });
-        }
-      });
-      setMoveButton({ move: false, folder: folderPath, files: filesToMove });
-      changeAllCheckboxState(false);
-    } else {
-      if (drop && moveButton.folder !== folderPath) {
-        ipcRenderer.send('files:move', {
-          fromFolder: moveButton.folder,
-          files: moveButton.files,
-          toFolder: folderPath,
-        });
-      } else if (!drop) {
-        console.log('Moving cancelled');
-      } else if (moveButton.folder === folderPath) {
-        console.log('Tried to drop into the origin folder');
-      }
-      setMoveButton(JSON.parse(JSON.stringify(defaultMoveButton)));
-    }
-  }
-
   return (
-    <Container fluid>
-      <ButtonToolbar
-        className="justify-content-between"
-        aria-label="Toolbar with Button groups"
-      >
-        <ButtonGroup>
-          {folders.map((folder, index) => {
-            //if (folders.length - 1 != index) {
-            return (
-              <Card key={index}>
-                <Button onClick={() => goBackTo(index)}>{folder}</Button>
-              </Card>
-            );
-            //}
-          })}
-        </ButtonGroup>
-        <ButtonGroup>
-          <Card>
-            <Button disabled={!massButtons} onClick={() => downloadSelected()}>
-              Download
-            </Button>
-          </Card>
-          <Card>
-            {moveButton.move ? (
-              <Button disabled={!massButtons} onClick={() => moveAndDrop()}>
-                Cut
-              </Button>
-            ) : (
-              <ButtonGroup>
-                <Button
-                  disabled={moveButton.folder === folderPath}
-                  onClick={() => moveAndDrop()}
-                >
-                  Paste
+    <DragAndDropzone folderPath={folderPath}>
+      <Container fluid>
+        <ButtonToolbar
+          className="justify-content-between"
+          aria-label="Toolbar with Button groups"
+        >
+          <ButtonGroup>
+            {folders.map((folder, index) => {
+              //if (folders.length - 1 != index) {
+              return (
+                <Card key={index}>
+                  <Button onClick={() => goBackTo(index)}>{folder}</Button>
+                </Card>
+              );
+              //}
+            })}
+          </ButtonGroup>
+          <ActionButtons
+            metadata={metadata}
+            folderPath={folderPath}
+            massButtons={massButtons}
+            downloadFunc={downloadFunc}
+            changeAllCheckboxState={changeAllCheckboxState}
+          ></ActionButtons>
+        </ButtonToolbar>
+        <Table size="sm">
+          <thead>
+            <tr>
+              <th>
+                <Checkbox
+                  checked={selectAllCheckbox}
+                  onChange={(t) => changeAllCheckboxState(t.target.checked)}
+                />
+              </th>
+              <th></th>
+              <th>
+                <Button variant="outline-secondary" onClick={sortName}>
+                  Name
+                  {sorts.name.show ? ' ' + sorts.name.icon : ''}
                 </Button>
-                <Button onClick={() => moveAndDrop(false)}>Cancel</Button>
-              </ButtonGroup>
-            )}
-          </Card>
-          <Card className="mr-1">
-            <Button disabled={!massButtons} onClick={() => deleteSelected()}>
-              Delete
-            </Button>
-          </Card>
-          <Card className="mr-1">
-            <Button onClick={() => newFolder()}>Create Folder</Button>
-          </Card>
-          <Card>
-            <Button onClick={(e) => uploadButton(e, true)}>
-              Upload Folder
-            </Button>
-          </Card>
-          <Card>
-            <Button onClick={uploadButton}>Upload Files</Button>
-          </Card>
-        </ButtonGroup>
-      </ButtonToolbar>
-      <Table size="sm">
-        <thead>
-          <tr>
-            <th>
-              {' '}
-              <Checkbox
-                checked={selectAllCheckbox}
-                onChange={(t) => changeAllCheckboxState(t.target.checked)}
-              />
-            </th>
-            <th></th>
-            <th>
-              <Button variant="outline-secondary" onClick={sortName}>
-                Name
-                {sorts.name.show ? ' ' + sorts.name.icon : ''}
-              </Button>
-            </th>
-            <th>
-              {' '}
-              <Button variant="outline-secondary" onClick={sortCreated}>
-                Created
-                {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
-              </Button>
-            </th>
-            <th>
-              <Button variant="outline-secondary" onClick={sortSize}>
-                Size
-                {sorts.size.show ? ' ' + sorts.size.icon : ''}
-              </Button>
-            </th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {metadata &&
-            metadata.folders.map((folder, index) => {
-              return (
-                <Folder
-                  key={index}
-                  folder={folder}
-                  updatePath={updatePath}
-                  downloadFunc={downloadFunc}
-                  deleteFunc={deleteFunc}
-                  renameFunc={renameFunc}
-                  changeCheckboxState={changeFolderCheckboxState}
-                />
-              );
-            })}
-          {metadata &&
-            metadata.files.map((file, index) => {
-              return (
-                <File
-                  key={index}
-                  file={file}
-                  deleteFunc={deleteFunc}
-                  downloadFunc={downloadFunc}
-                  renameFunc={renameFunc}
-                  changeCheckboxState={changeFileCheckboxState}
-                />
-              );
-            })}
-        </tbody>
-      </Table>
-      <ToastContainer
-        position="bottom-right"
-        limit={7}
-        hideProgressBar={false}
-        autoClose={false}
-        newestOnTop={true}
-        closeOnClick={true}
-        draggable={false}
-        rtl={false}
-      />
-    </Container>
+              </th>
+              <th>
+                <Button variant="outline-secondary" onClick={sortCreated}>
+                  Created
+                  {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
+                </Button>
+              </th>
+              <th>
+                <Button variant="outline-secondary" onClick={sortSize}>
+                  Size
+                  {sorts.size.show ? ' ' + sorts.size.icon : ''}
+                </Button>
+              </th>
+              <th style={{ fontWeight: 500 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metadata &&
+              metadata.folders.map((folder, index) => {
+                return (
+                  <FolderTableItem
+                    key={index}
+                    folder={folder}
+                    updatePath={updatePath}
+                    downloadFunc={downloadFunc}
+                    deleteFunc={deleteFunc}
+                    renameFunc={renameFunc}
+                    changeCheckboxState={changeFolderCheckboxState}
+                  />
+                );
+              })}
+            {metadata &&
+              metadata.files.map((file, index) => {
+                return (
+                  <FileTableItem
+                    key={index}
+                    file={file}
+                    deleteFunc={deleteFunc}
+                    downloadFunc={downloadFunc}
+                    renameFunc={renameFunc}
+                    changeCheckboxState={changeFileCheckboxState}
+                  />
+                );
+              })}
+          </tbody>
+        </Table>
+        {(() => {
+          if (
+            metadata &&
+            metadata.files.length === 0 &&
+            metadata.folders.length === 0
+          )
+            return (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontWeight: 'bold', opacity: 0.8 }}>
+                  There are no items in this folder
+                </p>
+                <p>
+                  Drag files and folders here to upload, or click the upload
+                  button on the top right to browse files from your computer.
+                </p>
+              </div>
+            );
+        })()}
+        <ToastContainer
+          position="bottom-right"
+          limit={7}
+          hideProgressBar={false}
+          autoClose={false}
+          newestOnTop={true}
+          closeOnClick={true}
+          draggable={false}
+          rtl={false}
+        />
+      </Container>
+    </DragAndDropzone>
   );
 };
 
