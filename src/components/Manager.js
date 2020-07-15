@@ -1,7 +1,6 @@
 import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
-import * as Utils from './../../opacity/Utils';
 import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
@@ -10,11 +9,12 @@ import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
 import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
 import Card from 'react-bootstrap/Card';
-import File from './File';
-import Folder from './Folder';
-import DragAndDropzone from './DragAndDropzone';
 import Swal from 'sweetalert2';
 import Styled from 'styled-components';
+import * as Utils from './../../opacity/Utils';
+import FileTableItem from './FileTableItem';
+import FolderTableItem from './FolderTableItem';
+import DragAndDropzone from './DragAndDropzone';
 import ActionButtons from './ActionButtons';
 
 const Checkbox = Styled.input.attrs({
@@ -56,13 +56,13 @@ const Manager = () => {
   useEffect(() => {
     ipcRenderer.on('metadata:set', (e, newMetadata) => {
       if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
-        addCheckboxValues(newMetadata.metadata);
+        modifyMetadataAndSetIt(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
     });
   }, []);
 
-  function addCheckboxValues(metadata) {
+  function modifyMetadataAndSetIt(metadata) {
     const copyMetadata = JSON.parse(JSON.stringify(metadata));
     copyMetadata.folders.forEach(function (folder) {
       folder.checked = false;
@@ -364,7 +364,7 @@ const Manager = () => {
             {metadata &&
               metadata.folders.map((folder, index) => {
                 return (
-                  <Folder
+                  <FolderTableItem
                     key={index}
                     folder={folder}
                     updatePath={updatePath}
@@ -378,7 +378,7 @@ const Manager = () => {
             {metadata &&
               metadata.files.map((file, index) => {
                 return (
-                  <File
+                  <FileTableItem
                     key={index}
                     file={file}
                     deleteFunc={deleteFunc}

@@ -15,7 +15,7 @@ const Checkbox = Styled.input.attrs({
   type: 'checkbox',
 })``;
 
-const Folder = ({
+const FolderTableItem = ({
   folder,
   updatePath,
   downloadFunc,
@@ -81,4 +81,4 @@ const Folder = ({
   );
 };
 
-export default Folder;
+export default FolderTableItem;

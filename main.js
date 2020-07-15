@@ -126,6 +126,8 @@ ipcMain.on('handle:set', async (e, handleObject) => {
     }
 
     await setAccount(handleObject.handle);
+    // Call this function before saving the handle to see if the entered handle is correct
+    // eg. mixed up letters etc.
     await refreshFolder('/');
 
     if (handleObject.saveHandle) {

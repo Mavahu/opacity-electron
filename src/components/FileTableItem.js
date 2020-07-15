@@ -3,6 +3,8 @@ import Moment from 'react-moment';
 import Filesize from 'filesize';
 import Button from 'react-bootstrap/Button';
 import ButtonGroup from 'react-bootstrap/ButtonGroup';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 import Swal from 'sweetalert2';
 import * as Clipboardy from 'clipboardy';
 import {
@@ -13,14 +15,12 @@ import {
 } from 'react-icons/ai';
 import { FiEdit } from 'react-icons/fi';
 import Styled from 'styled-components';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Tooltip from 'react-bootstrap/Tooltip';
 
 const Checkbox = Styled.input.attrs({
   type: 'checkbox',
 })``;
 
-const File = ({
+const FileTableItem = ({
   file,
   deleteFunc,
   downloadFunc,
@@ -102,4 +102,4 @@ const File = ({
   );
 };
 
-export default File;
+export default FileTableItem;

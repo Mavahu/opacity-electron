@@ -39,6 +39,7 @@ $ npm run package
 - [x] Files sorting
 - [x] Drag and drop files/folders
 - [ ] Upload/Download settings
-- [ ] Implement account-handle check
+- [x] Implement account-handle check
 - [ ] Account informations
 - [ ] Batch requests
+- [ ] About me window

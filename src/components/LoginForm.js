@@ -12,13 +12,13 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    ipcRenderer.send('login:restore');
-
     ipcRenderer.on('login:success', (e) => history.push('manager'));
 
     ipcRenderer.on('login:failed', (e, message) => {
       setErrorMessage(message.error);
     });
+
+    ipcRenderer.send('login:restore');
   }, []);
 
   const onSubmit = (e) => {
