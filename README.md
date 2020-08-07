@@ -38,8 +38,9 @@ $ npm run package
 - [x] Handle saving/resetting
 - [x] Files sorting
 - [x] Drag and drop files/folders
-- [ ] Upload/Download settings
+- [x] Upload/Download settings
 - [x] Implement account-handle check
 - [ ] Account informations
 - [ ] Batch requests
 - [ ] About me window
+- [ ] Download/Sync whole account

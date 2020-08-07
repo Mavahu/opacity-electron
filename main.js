@@ -5,6 +5,7 @@ const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
+const storage = require('electron-settings');
 
 let mainWindow;
 let account;
@@ -73,7 +74,8 @@ function createMainWindow() {
 app.on('ready', () => {
   createMainWindow();
   const mainMenu = Menu.buildFromTemplate(menu);
-  Menu.setApplicationMenu(mainMenu);
+  Menu.setApplicationMenu(null);
+  mainWindow.setMenu(mainMenu);
 });
 
 const menu = [
@@ -84,6 +86,10 @@ const menu = [
       {
         label: 'Reset Handle',
         click: () => resetHandle(),
+      },
+      {
+        label: 'Settings',
+        click: () => settingsPage(),
       },
       isMac ? { role: 'close' } : { role: 'quit' },
     ],
@@ -104,6 +110,10 @@ const menu = [
       ]
     : []),
 ];
+
+async function settingsPage() {
+  mainWindow.webContents.send('settings:open');
+}
 
 async function resetHandle() {
   await keytar.deletePassword('Opacity', 'Handle');
@@ -157,7 +167,7 @@ ipcMain.on('files:delete', async (e, files) => {
 
 ipcMain.on('files:upload', async (e, toUpload) => {
   for (const file of toUpload.files) {
-    await account.upload(toUpload.folder, file).then((response) => {
+    account.upload(toUpload.folder, file).then((response) => {
       if (response) {
         refreshFolder(toUpload.folder);
       }
@@ -194,7 +204,18 @@ ipcMain.on('files:move', async (e, moveObj) => {
 });
 
 async function setAccount(handle) {
-  account = new OpacityAccount(handle);
+  const userSettings = await storage.get('settings');
+  console.log(userSettings);
+  if (userSettings) {
+    account = new OpacityAccount(
+      handle,
+      userSettings.maxSimultaneousDownloads,
+      userSettings.maxSimultaneousUploads
+    );
+  } else {
+    account = new OpacityAccount(handle, 1, 1);
+  }
+
   await account.checkAccountStatus();
 
   // set up listeners

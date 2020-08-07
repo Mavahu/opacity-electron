@@ -22,7 +22,7 @@ import { Semaphore, Mutex } from 'async-mutex';
 class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
 
-  constructor(handle) {
+  constructor(handle, maxSimultaneousDownloads, maxSimultaneousUploads) {
     super();
     this.handle = handle;
     this.privateKey = handle.slice(0, 64);
@@ -31,12 +31,11 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.privateKey, 'hex'),
       Buffer.from(this.chainCode, 'hex')
     );
-    // donwloadMutex and uploadMutex allow only 1 down- and upload simultaniously
-    // TODO: Change them to semaphores, and add the initiation value to the constructor
-    this.downloadMutex = new Mutex();
-    this.downloadChunksSemaphore = new Semaphore(10);
-    this.uploadMutex = new Mutex();
-    this.uploadChunksSemaphore = new Semaphore(5);
+    this.downloadSemaphore = new Semaphore(maxSimultaneousDownloads);
+    this.maxDownloadChunks = 10;
+    this.uploadSemaphore = new Semaphore(maxSimultaneousUploads);
+    this.maxUploadChunks = 10;
+    // aquire this mutex, when you modify the metadata to make sure to not miss a metadata update
     this.metadataMutex = new Mutex();
   }
 
@@ -256,7 +255,7 @@ class OpacityAccount extends EventEmitter {
   }
 
   async upload(folder, fileOrFolderPath) {
-    const release = await this.uploadMutex.acquire();
+    const [value, release] = await this.uploadSemaphore.acquire();
     try {
       return await this._uploadHandler(folder, fileOrFolderPath);
     } catch (e) {
@@ -346,12 +345,20 @@ class OpacityAccount extends EventEmitter {
         console.log(response);
       }
 
+      const uploadChunksSemaphore = new Semaphore(this.maxUploadChunks);
       const promises = [];
       Array(endIndex)
         .fill()
         .map((_, i) => {
           promises.push(
-            this._uploadFilePart(fileData, fileMetaData, handle, i, endIndex)
+            this._uploadFilePart(
+              fileData,
+              fileMetaData,
+              handle,
+              i,
+              endIndex,
+              uploadChunksSemaphore
+            )
           );
         });
       await Promise.allSettled(promises);
@@ -436,9 +443,10 @@ class OpacityAccount extends EventEmitter {
     fileMetadata,
     handle,
     currentIndex,
-    endIndex
+    endIndex,
+    uploadChunksSemaphore
   ) {
-    const [value, release] = await this.uploadChunksSemaphore.acquire();
+    const [value, release] = await uploadChunksSemaphore.acquire();
     try {
       this.emit(
         `upload:progress:${handle.toString('hex')}`,
@@ -457,7 +465,7 @@ class OpacityAccount extends EventEmitter {
       );
 
       const numChunks = Math.ceil(rawpart.length / fileMetadata.p.blockSize);
-      let encryptedData = Buffer.alloc(0);
+      let encryptedChunks = [];
       for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
         const remaining =
           rawpart.length - chunkIndex * fileMetadata.p.blockSize;
@@ -470,8 +478,9 @@ class OpacityAccount extends EventEmitter {
           chunkIndex * fileMetadata.p.blockSize + chunkSize
         );
         const encryptedChunk = Utils.encrypt(chunk, keyBytes);
-        encryptedData = Buffer.concat([encryptedData, encryptedChunk]);
+        encryptedChunks.push(encryptedChunk);
       }
+      const encryptedData = Buffer.concat(encryptedChunks);
 
       const requestBody = {
         fileHandle: fileId,
@@ -498,7 +507,7 @@ class OpacityAccount extends EventEmitter {
   }
 
   async download(opacityFolder, fileOrFolder, savingPath) {
-    const release = await this.downloadMutex.acquire();
+    const [value, release] = await this.downloadSemaphore.acquire();
     try {
       if (fileOrFolder.handle.length === 128) {
         return await this._downloadFile(fileOrFolder.handle, savingPath);
@@ -555,6 +564,7 @@ class OpacityAccount extends EventEmitter {
     //console.log(`Downloading file: ${fileMetadata.name}`);
     const fileDownloadUrl = downloadUrl + '/file';
 
+    const downloadChunksSemaphore = new Semaphore(this.maxDownloadChunks);
     const promises = [];
     const time = Date.now();
     Array(parts)
@@ -568,7 +578,8 @@ class OpacityAccount extends EventEmitter {
             uploadSize,
             fileDownloadUrl,
             folderPath,
-            handle
+            handle,
+            downloadChunksSemaphore
           )
         );
       });
@@ -638,9 +649,10 @@ class OpacityAccount extends EventEmitter {
     uploadSize,
     fileDownloadUrl,
     folderPath,
-    handle
+    handle,
+    downloadChunksSemaphore
   ) {
-    const [value, release] = await this.downloadChunksSemaphore.acquire();
+    const [value, release] = await downloadChunksSemaphore.acquire();
     try {
       this.emit(
         `download:progress:${handle}`,

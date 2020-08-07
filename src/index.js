@@ -3,6 +3,7 @@ import { render } from 'react-dom';
 import { HashRouter as Router, Route } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import Manager from './components/Manager';
+import SettingsPage from './components/SettingsPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,6 +23,7 @@ render(
       <main>
         <Route exact path="/" component={LoginForm} />
         <Route path="/manager" component={Manager} />
+        <Route path="/settings" component={SettingsPage} />
       </main>
     </div>
   </Router>,

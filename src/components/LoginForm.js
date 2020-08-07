@@ -12,7 +12,10 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    ipcRenderer.on('login:success', (e) => history.push('manager'));
+    ipcRenderer.once('login:success', (e) => {
+      ipcRenderer.removeAllListeners('login:failed');
+      history.push('manager');
+    });
 
     ipcRenderer.on('login:failed', (e, message) => {
       setErrorMessage(message.error);

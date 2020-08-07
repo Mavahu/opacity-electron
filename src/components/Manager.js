@@ -2,6 +2,7 @@ import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
 import React, { useState, useEffect, useRef } from 'react';
+import { useHistory } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
@@ -22,6 +23,7 @@ const Checkbox = Styled.input.attrs({
 })``;
 
 const Manager = () => {
+  const history = useHistory();
   const [folderPath, setFolderPath] = useState('/');
   //reference needed to use folderPath in useEffect
   const refFolderPath = useRef(folderPath);
@@ -59,6 +61,16 @@ const Manager = () => {
         modifyMetadataAndSetIt(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
+    });
+
+    ipcRenderer.on('settings:open', () => {
+      ipcRenderer.removeAllListeners('metadata:set');
+      ipcRenderer.removeAllListeners('settings:open');
+      ipcRenderer.removeAllListeners('toast:create');
+      ipcRenderer.removeAllListeners('toast:update');
+      ipcRenderer.removeAllListeners('toast:finished');
+      console.log('opening settings');
+      history.push('settings');
     });
   }, []);
 
