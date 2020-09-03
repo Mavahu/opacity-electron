@@ -38,8 +38,7 @@ const SettingsPage = () => {
     e.preventDefault();
     console.log(applicationSettings);
 
-    storage.set('settings', applicationSettings);
-
+    ipcRenderer.send('semaphore:update', applicationSettings);
     ipcRenderer.send('path:update', '/');
     history.goBack();
   };
@@ -51,12 +50,15 @@ const SettingsPage = () => {
   };
 
   return (
-    <Container>
+    <Container
+      style={{
+        margin: 25,
+        display: 'flex',
+      }}
+    >
       <Form onSubmit={onSubmit} onReset={onReset}>
         <Form.Group as={Row}>
-          <Form.Label column sm={2}>
-            Simultaneous Uploads
-          </Form.Label>
+          <Form.Label column>Simultaneous Uploads</Form.Label>
           <Col xs="auto">
             <Form.Control
               type="number"
@@ -72,10 +74,8 @@ const SettingsPage = () => {
         </Form.Group>
 
         <Form.Group as={Row}>
-          <Form.Label column sm={2}>
-            Simultaneous Downloads
-          </Form.Label>
-          <Col sm={10}>
+          <Form.Label column>Simultaneous Downloads</Form.Label>
+          <Col xs="auto">
             <Form.Control
               type="number"
               defaultValue={applicationSettings.maxSimultaneousDownloads}

@@ -3,7 +3,7 @@ const { dialog } = require('electron').remote;
 import Path from 'path';
 import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
@@ -220,6 +220,7 @@ const Manager = () => {
             files: item,
             savingPath: result.filePaths[0],
           });
+          changeAllCheckboxState(false);
         }
       })
       .catch((err) => {
@@ -420,16 +421,6 @@ const Manager = () => {
               </div>
             );
         })()}
-        <ToastContainer
-          position="bottom-right"
-          limit={7}
-          hideProgressBar={false}
-          autoClose={false}
-          newestOnTop={true}
-          closeOnClick={true}
-          draggable={false}
-          rtl={false}
-        />
       </Container>
     </DragAndDropzone>
   );

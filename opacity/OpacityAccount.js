@@ -17,7 +17,8 @@ import Fs from 'fs';
 import Crypto from 'crypto';
 import FormData from 'form-data';
 import { EventEmitter } from 'events';
-import { Semaphore, Mutex } from 'async-mutex';
+import { Mutex } from 'async-mutex';
+import Semaphore from 'simple-semaphore';
 
 class OpacityAccount extends EventEmitter {
   baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
@@ -32,9 +33,9 @@ class OpacityAccount extends EventEmitter {
       Buffer.from(this.chainCode, 'hex')
     );
     this.downloadSemaphore = new Semaphore(maxSimultaneousDownloads);
-    this.maxDownloadChunks = 10;
+    this.maxDownloadChunks = 5;
     this.uploadSemaphore = new Semaphore(maxSimultaneousUploads);
-    this.maxUploadChunks = 10;
+    this.maxUploadChunks = 5;
     // aquire this mutex, when you modify the metadata to make sure to not miss a metadata update
     this.metadataMutex = new Mutex();
   }
@@ -255,13 +256,13 @@ class OpacityAccount extends EventEmitter {
   }
 
   async upload(folder, fileOrFolderPath) {
-    const [value, release] = await this.uploadSemaphore.acquire();
+    await this.uploadSemaphore.wait();
     try {
       return await this._uploadHandler(folder, fileOrFolderPath);
     } catch (e) {
       console.log(e);
     } finally {
-      release();
+      this.uploadSemaphore.signal();
     }
   }
 
@@ -446,12 +447,12 @@ class OpacityAccount extends EventEmitter {
     endIndex,
     uploadChunksSemaphore
   ) {
-    const [value, release] = await uploadChunksSemaphore.acquire();
+    await uploadChunksSemaphore.wait();
     try {
       this.emit(
         `upload:progress:${handle.toString('hex')}`,
         currentIndex + 1 !== endIndex
-          ? Math.floor((currentIndex / endIndex) * 100)
+          ? ((currentIndex / endIndex) * 100).toFixed(2)
           : 99.9
       );
       console.log(`Uploading Part ${currentIndex + 1} out of ${endIndex}`);
@@ -502,12 +503,12 @@ class OpacityAccount extends EventEmitter {
       });
       //console.log(`Upload-time: ${Date.now() - time}ms`);
     } finally {
-      release();
+      uploadChunksSemaphore.signal();
     }
   }
 
   async download(opacityFolder, fileOrFolder, savingPath) {
-    const [value, release] = await this.downloadSemaphore.acquire();
+    await this.downloadSemaphore.wait();
     try {
       if (fileOrFolder.handle.length === 128) {
         return await this._downloadFile(fileOrFolder.handle, savingPath);
@@ -519,7 +520,7 @@ class OpacityAccount extends EventEmitter {
         );
       }
     } finally {
-      release();
+      this.downloadSemaphore.signal();
     }
   }
 
@@ -652,12 +653,12 @@ class OpacityAccount extends EventEmitter {
     handle,
     downloadChunksSemaphore
   ) {
-    const [value, release] = await downloadChunksSemaphore.acquire();
+    await downloadChunksSemaphore.wait();
     try {
       this.emit(
         `download:progress:${handle}`,
         partIndex + 1 !== endPartIndex
-          ? Math.floor((partIndex / endPartIndex) * 100)
+          ? ((partIndex / endPartIndex) * 100).toFixed(2)
           : 99.9
       );
       console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
@@ -674,7 +675,7 @@ class OpacityAccount extends EventEmitter {
       const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
       Fs.writeFileSync(fileToWriteTo, response.data);
     } finally {
-      release();
+      downloadChunksSemaphore.signal();
     }
   }
 
@@ -880,6 +881,26 @@ class OpacityAccount extends EventEmitter {
       await this._createFolderHandler(newFolderPath);
       await this._copyMetadata(oldFolderPath, newFolderPath);
     }
+  }
+
+  increaseUploadSemaphore(value) {
+    this.uploadSemaphore.signal(value);
+    console.log(`Sucessfully increased the UploadSemaphore by ${value}`);
+  }
+
+  async decreaseUploadSemaphore(value) {
+    await this.uploadSemaphore.wait(value);
+    console.log(`Sucessfully decreased the UploadSemaphore by ${value}`);
+  }
+
+  increaseDownloadSemaphore(value) {
+    this.downloadSemaphore.signal(value);
+    console.log(`Sucessfully increased the DownloadSemaphore by ${value}`);
+  }
+
+  async decreaseDownloadSemaphore(value) {
+    await this.downloadSemaphore.wait(value);
+    console.log(`Sucessfully decreased the DownloadSemaphore by ${value}`);
   }
 }
 

@@ -46,6 +46,7 @@
     "react-moment": "^0.9.7",
     "react-router-dom": "^5.2.0",
     "react-toastify": "^6.0.5",
+    "simple-semaphore": "^2.1.0",
     "styled-components": "^5.1.1",
     "sweetalert2": "^9.15.1",
     "sweetalert2-react-content": "^3.0.1",

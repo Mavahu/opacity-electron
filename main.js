@@ -177,7 +177,7 @@ ipcMain.on('files:upload', async (e, toUpload) => {
 
 ipcMain.on('files:download', async (e, toDownload) => {
   for (const file of toDownload.files) {
-    await account.download(toDownload.folder, file, toDownload.savingPath);
+    account.download(toDownload.folder, file, toDownload.savingPath);
   }
 });
 
@@ -201,6 +201,32 @@ ipcMain.on('files:move', async (e, moveObj) => {
       refreshFolder(moveObj.toFolder);
     }
   }
+});
+
+ipcMain.on('semaphore:update', async (e, semaphoreValues) => {
+  const currentSemaphores = await storage.get('settings');
+
+  const UploadSemaphoreDifference =
+    currentSemaphores.maxSimultaneousUploads -
+    semaphoreValues.maxSimultaneousUploads;
+  console.log(UploadSemaphoreDifference);
+  if (UploadSemaphoreDifference > 0) {
+    account.decreaseUploadSemaphore(UploadSemaphoreDifference);
+  } else if (UploadSemaphoreDifference < 0) {
+    account.increaseUploadSemaphore(Math.abs(UploadSemaphoreDifference));
+  }
+
+  const DownloadSemaphoreDifference =
+    currentSemaphores.maxSimultaneousDownloads -
+    semaphoreValues.maxSimultaneousDownloads;
+  console.log(DownloadSemaphoreDifference);
+  if (DownloadSemaphoreDifference > 0) {
+    account.decreaseDownloadSemaphore(DownloadSemaphoreDifference);
+  } else if (DownloadSemaphoreDifference < 0) {
+    account.increaseDownloadSemaphore(Math.abs(DownloadSemaphoreDifference));
+  }
+
+  storage.set('settings', semaphoreValues);
 });
 
 async function setAccount(handle) {

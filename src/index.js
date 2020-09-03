@@ -10,6 +10,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 
+import { ToastContainer, toast } from 'react-toastify';
+
 // Since we are using HtmlWebpackPlugin WITHOUT a template, we should create our own root node in the body element before rendering into it
 let root = document.createElement('div');
 
@@ -26,6 +28,16 @@ render(
         <Route path="/settings" component={SettingsPage} />
       </main>
     </div>
+    <ToastContainer
+      position="bottom-right"
+      limit={7}
+      hideProgressBar={false}
+      autoClose={false}
+      newestOnTop={true}
+      closeOnClick={true}
+      draggable={false}
+      rtl={false}
+    />
   </Router>,
   document.getElementById('root')
 );
