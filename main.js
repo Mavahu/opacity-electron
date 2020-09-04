@@ -157,12 +157,10 @@ ipcMain.on('path:update', async (e, newPath) => {
 });
 
 ipcMain.on('files:delete', async (e, files) => {
-  for (const file of files) {
-    if (await account.delete(file.folder, file.handle, file.name)) {
-      refreshFolder(file.folder);
-    }
-    mainWindow.webContents.send(`file:deleted:${file.handle}`);
+  if (await account.delete(files.folder, files.files)) {
+    refreshFolder(files.folder);
   }
+  //mainWindow.webContents.send(`file:deleted:${file.handle}`);
 });
 
 ipcMain.on('files:upload', async (e, toUpload) => {

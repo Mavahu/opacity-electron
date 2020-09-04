@@ -133,13 +133,13 @@ class OpacityAccount extends EventEmitter {
     return FolderMetadata.toObject(decryptedJson);
   }
 
-  async delete(folder, handle, name) {
+  async delete(folder, files) {
     const release = await this.metadataMutex.acquire();
-    this.emit('delete:init', { handle: handle, fileName: name });
+    //this.emit('delete:init', { handle: handle, fileName: name });
     try {
-      const response = await this._deleteHandler(folder, handle);
+      const response = await this._deleteHandler(folder, files);
       if (response) {
-        this.emit(`delete:finished:${handle}`);
+        //this.emit(`delete:finished:${handle}`);
       }
       return response;
     } catch (e) {
@@ -149,31 +149,53 @@ class OpacityAccount extends EventEmitter {
     }
   }
 
-  async _deleteHandler(folder, handle, deleteFiles = true) {
-    if (handle.length === 128) {
+  async _deleteHandler(folder, files, deleteFiles = true) {
+    // Iterate through all files and get all files and then just delete them all at once
+    const filesToDelete = [];
+    await Promise.allSettled(
+      files.map(async (file) => {
+        console.log('starting');
+        if (file.handle.length === 128) {
+          try {
+            const rawPayload = {
+              fileId: file.handle.slice(0, 64),
+            };
+
+            const rawPayloadJson = JSON.stringify(rawPayload);
+            const payload = this._signPayload(rawPayloadJson);
+            const payloadJson = JSON.stringify(payload);
+
+            const response = await Axios.post(
+              this.baseUrl + 'delete',
+              payloadJson
+            );
+
+            if (response.status === 200) {
+              filesToDelete.push(file.handle);
+            } else {
+              console.log(response);
+            }
+          } catch (error) {
+            console.log(error);
+          }
+        }
+        console.log('done');
+      })
+    );
+
+    if (filesToDelete) {
       const metadata = await this.getFolderMetadata(folder);
-      const rawPayload = {
-        fileId: handle.slice(0, 64),
-      };
-      const rawPayloadJson = JSON.stringify(rawPayload);
+      metadata.metadata.files = metadata.metadata.files.filter((file) => {
+        return !filesToDelete.includes(file.versions[0].handle);
+      });
+      await this._setMetadata(metadata);
+    }
 
-      const payload = this._signPayload(rawPayloadJson);
-      const payloadJson = JSON.stringify(payload);
-
-      const response = await Axios.post(this.baseUrl + 'delete', payloadJson);
-
-      if (response.status === 200) {
-        const newFiles = metadata.metadata.files.filter(function (file) {
-          return file.versions[0].handle !== handle;
-        });
-        metadata.metadata.files = newFiles;
-        await this._setMetadata(metadata);
-        console.log(`Deleted file ${handle}`);
-        return true;
-      } else {
-        console.log(response);
+    files.map((folder) => {
+      if (folder.handle.length === 64) {
       }
-    } else if (handle.length === 64) {
+    });
+    if (handle.length === 64) {
       const metadata = await this.getFolderMetadata(folder);
       const folderToDelete = metadata.metadata.folders.find(
         (folder) => folder.handle === handle
