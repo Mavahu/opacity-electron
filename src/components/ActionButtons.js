@@ -161,7 +161,7 @@ const ActionButtons = ({
       <Card>
         {cutButton.cut ? (
           <Button disabled={!massButtons} onClick={() => cutAndPaste()}>
-            Cut
+            Move
           </Button>
         ) : (
           <ButtonGroup>

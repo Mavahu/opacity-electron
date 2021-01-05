@@ -202,7 +202,7 @@ ipcMain.on('files:move', async (e, moveObj) => {
 });
 
 ipcMain.on('semaphore:update', async (e, semaphoreValues) => {
-  const currentSemaphores = await storage.get('settings');
+  const currentSemaphores = storage.get('settings');
 
   const UploadSemaphoreDifference =
     currentSemaphores.maxSimultaneousUploads -

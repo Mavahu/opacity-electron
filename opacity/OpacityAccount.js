@@ -35,7 +35,7 @@ class OpacityAccount extends EventEmitter {
     this.downloadSemaphore = new Semaphore(maxSimultaneousDownloads);
     this.maxDownloadChunks = 5;
     this.uploadSemaphore = new Semaphore(maxSimultaneousUploads);
-    this.maxUploadChunks = 5;
+    this.maxUploadChunks = 8;
     // aquire this mutex, when you modify the metadata to make sure to not miss a metadata update
     this.metadataMutex = new Mutex();
   }
@@ -312,6 +312,7 @@ class OpacityAccount extends EventEmitter {
   }
 
   async _uploadFile(folder, filePath) {
+    let handleHexError = '';
     try {
       const fileName = Path.basename(filePath);
       const stats = Fs.statSync(filePath);
@@ -329,7 +330,6 @@ class OpacityAccount extends EventEmitter {
           return;
         }
       }
-      console.log(`Uploading file: ${fileData.name}`);
       const fileMetaData = FileMetadata.toObject(fileData);
       const uploadSize = Utils.getUploadSize(fileMetaData.size);
       const endIndex = Utils.getEndIndex(uploadSize, fileMetaData.p);
@@ -344,6 +344,8 @@ class OpacityAccount extends EventEmitter {
       );
 
       const handleHex = handle.toString('hex');
+      handleHexError = handleHex;
+      console.log(`Uploading file: ${fileData.name} as ${handleHex}`);
       this.emit('upload:init', { handle: handleHex, fileName: fileData.name });
       const fileId = handleHex.slice(0, 64);
 
@@ -408,7 +410,8 @@ class OpacityAccount extends EventEmitter {
               fileMetaData,
               handle,
               missingPart - 1,
-              endIndex
+              endIndex,
+              uploadChunksSemaphore
             );
           }
           response = await Axios.post(
@@ -456,8 +459,9 @@ class OpacityAccount extends EventEmitter {
       this.emit(`upload:finished:${handleHex}`);
       return true;
     } catch (e) {
+      console.log(`Upload failed of ${handleHexError}`);
       console.log(e);
-      this.emit(`upload:failed:${handleHex}`);
+      this.emit(`upload:failed:${handleHexError}`);
     }
   }
 
