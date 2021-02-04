@@ -157,6 +157,7 @@ ipcMain.on('path:update', async (e, newPath) => {
 });
 
 ipcMain.on('files:delete', async (e, files) => {
+  console.log(files);
   if (await account.delete(files.folder, files.files)) {
     refreshFolder(files.folder);
   }

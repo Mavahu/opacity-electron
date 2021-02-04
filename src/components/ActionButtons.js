@@ -112,7 +112,7 @@ const ActionButtons = ({
       title: 'Enter the folder name',
       input: 'text',
       showCancelButton: true,
-      cancelButtonColor: '#d33',
+      cancelButtonColor: '#dd3333',
       inputValidator: (value) => {
         if (!value) {
           return 'You need to write something!';

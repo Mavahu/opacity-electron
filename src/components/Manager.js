@@ -185,10 +185,10 @@ const Manager = () => {
     ipcRenderer.send('path:update', traversedPath);
   }
 
-  async function deleteFunc(handle, toDelete) {
+  async function deleteFunc(handle, name) {
     const { value: result } = await Swal.fire({
       title: 'Are you sure?',
-      html: `You won't be able to revert this!<br/>Deleting: ${toDelete}`,
+      html: `You won't be able to revert this!<br/>Deleting: ${name}`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -197,13 +197,10 @@ const Manager = () => {
     });
 
     if (result) {
-      ipcRenderer.send('files:delete', [
-        {
-          folder: folderPath,
+      ipcRenderer.send('files:delete', { folder: folderPath, files: [{
           handle: handle,
-          name: toDelete,
-        },
-      ]);
+          name: name,
+        }] });
       changeAllCheckboxState(false);
     }
   }

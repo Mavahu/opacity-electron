@@ -1,27 +1,27 @@
-import * as Bip32 from 'bip32';
-import Axios from 'axios';
-import * as EthCrypto from 'eth-crypto';
-import AccountStatus from './models/AccountStatus';
+import * as Bip32 from "bip32";
+import Axios from "axios";
+import * as EthCrypto from "eth-crypto";
+import AccountStatus from "./models/AccountStatus";
 import {
   FolderMetadata,
   FolderMetadataFolder,
   FolderMetadataFile,
   FolderMetadataFileVersion,
-} from './models/FolderMetadata';
-import FileMetadata from './models/FileMetadata';
-import Constants from './models/Constants';
-import * as Utils from './Utils';
-import BinaryFile from 'binary-file';
-import Path from 'path';
-import Fs from 'fs';
-import Crypto from 'crypto';
-import FormData from 'form-data';
-import { EventEmitter } from 'events';
-import { Mutex } from 'async-mutex';
-import Semaphore from 'simple-semaphore';
+} from "./models/FolderMetadata";
+import FileMetadata from "./models/FileMetadata";
+import Constants from "./models/Constants";
+import * as Utils from "./Utils";
+import BinaryFile from "binary-file";
+import Path from "path";
+import Fs from "fs";
+import Crypto from "crypto";
+import FormData from "form-data";
+import { EventEmitter } from "events";
+import { Mutex } from "async-mutex";
+import Semaphore from "simple-semaphore";
 
 class OpacityAccount extends EventEmitter {
-  baseUrl = 'https://broker-1.opacitynodes.com:3000/api/v1/';
+  baseUrl = "https://broker-1.opacitynodes.com:3000/api/v1/";
 
   constructor(handle, maxSimultaneousDownloads, maxSimultaneousUploads) {
     super();
@@ -29,8 +29,8 @@ class OpacityAccount extends EventEmitter {
     this.privateKey = handle.slice(0, 64);
     this.chainCode = handle.slice(64, 128);
     this.masterKey = Bip32.fromPrivateKey(
-      Buffer.from(this.privateKey, 'hex'),
-      Buffer.from(this.chainCode, 'hex')
+      Buffer.from(this.privateKey, "hex"),
+      Buffer.from(this.chainCode, "hex")
     );
     this.downloadSemaphore = new Semaphore(maxSimultaneousDownloads);
     this.maxDownloadChunks = 5;
@@ -50,7 +50,7 @@ class OpacityAccount extends EventEmitter {
     return {
       requestBody: rawPayload,
       signature: signature.slice(2, 130),
-      publicKey: this.masterKey.publicKey.toString('hex'),
+      publicKey: this.masterKey.publicKey.toString("hex"),
       hash: payloadHash.slice(2),
     };
   }
@@ -63,9 +63,9 @@ class OpacityAccount extends EventEmitter {
     );
 
     const form = new FormData();
-    form.append('requestBody', rawPayload);
-    form.append('signature', signature.slice(2, 130));
-    form.append('publicKey', this.masterKey.publicKey.toString('hex'));
+    form.append("requestBody", rawPayload);
+    form.append("signature", signature.slice(2, 130));
+    form.append("publicKey", this.masterKey.publicKey.toString("hex"));
 
     Object.keys(additionalPayload).forEach((key) => {
       form.append(key, additionalPayload[key], key);
@@ -84,7 +84,7 @@ class OpacityAccount extends EventEmitter {
     const payloadJson = JSON.stringify(payload);
 
     const response = await Axios.post(
-      this.baseUrl + 'account-data',
+      this.baseUrl + "account-data",
       payloadJson
     );
 
@@ -119,14 +119,14 @@ class OpacityAccount extends EventEmitter {
     const payloadJson = JSON.stringify(payload);
 
     const response = await Axios.post(
-      this.baseUrl + 'metadata/get',
+      this.baseUrl + "metadata/get",
       payloadJson
     );
 
-    const encryptedMetadata = Buffer.from(response.data.metadata, 'base64');
+    const encryptedMetadata = Buffer.from(response.data.metadata, "base64");
     const decrypted = Utils.decrypt(
       encryptedMetadata,
-      Buffer.from(keyString, 'hex')
+      Buffer.from(keyString, "hex")
     );
     const decryptedJson = JSON.parse(decrypted);
 
@@ -149,12 +149,20 @@ class OpacityAccount extends EventEmitter {
     }
   }
 
+  /**
+   * This returns true if the deletion was successful
+   * @param {string} folder The folderpath where the files/folders are contained.
+   * @param {Array} files An array of all files/folders you want to have deleted [{"name":"","handle":""}]
+   * @param {boolean} deleteFiles This parameter dictates if the files of a folder will be deleted
+   * @returns {boolean}
+   */
   async _deleteHandler(folder, files, deleteFiles = true) {
+    // 1. file deletion
     // Iterate through all files and get all files and then just delete them all at once
+    //console.log(files);
     const filesToDelete = [];
     await Promise.allSettled(
       files.map(async (file) => {
-        console.log('starting');
         if (file.handle.length === 128) {
           try {
             const rawPayload = {
@@ -166,86 +174,118 @@ class OpacityAccount extends EventEmitter {
             const payloadJson = JSON.stringify(payload);
 
             const response = await Axios.post(
-              this.baseUrl + 'delete',
+              this.baseUrl + "delete",
               payloadJson
             );
 
             if (response.status === 200) {
+              console.log(`Deleted ${file.name}`);
               filesToDelete.push(file.handle);
             } else {
               console.log(response);
             }
           } catch (error) {
+            console.log(`Failed to delete ${file.name}`);
             console.log(error);
           }
         }
-        console.log('done');
       })
     );
 
-    if (filesToDelete) {
+    if (filesToDelete.length !== 0) {
       const metadata = await this.getFolderMetadata(folder);
       metadata.metadata.files = metadata.metadata.files.filter((file) => {
         return !filesToDelete.includes(file.versions[0].handle);
       });
       await this._setMetadata(metadata);
+      console.log(`Deleted all files inside ${folder}`);
     }
 
-    files.map((folder) => {
-      if (folder.handle.length === 64) {
-      }
-    });
-    if (handle.length === 64) {
-      const metadata = await this.getFolderMetadata(folder);
-      const folderToDelete = metadata.metadata.folders.find(
-        (folder) => folder.handle === handle
-      );
-      const newFolderPath = Utils.getSlash(
-        Path.join(folder, folderToDelete.name)
-      );
-
-      const folderToDeleteMetadata = await this.getFolderMetadata(
-        newFolderPath
-      );
-
-      console.log(`Deleting ${newFolderPath}`);
-      for (const folder of folderToDeleteMetadata.metadata.folders) {
-        await this._deleteHandler(newFolderPath, folder.handle, deleteFiles);
-      }
-
-      if (deleteFiles) {
-        for (const file of folderToDeleteMetadata.metadata.files) {
-          await this._deleteHandler(
-            newFolderPath,
-            file.versions[0].handle,
-            deleteFiles
+    // 2. folder deletion
+    const foldersToDelete = [];
+    for (const folderToDelete of files) {
+      if (folderToDelete.handle.length === 64) {
+        try {
+          /*
+          const metadata = await this.getFolderMetadata(folder);
+          const folderToDelete = metadata.metadata.folders.find(
+            (folderIndex) => folderIndex.handle === folderToDelete.handle
           );
+          */
+
+          const folderToDeletePath = Utils.getSlash(
+            Path.join(folder, folderToDelete.name)
+          );
+          // get the metadata from the folder you want to delete to check if it contains any files / folders itself
+          // which you of course would need to delete before hand
+          const folderToDeleteMetadata = await this.getFolderMetadata(
+            folderToDeletePath
+          );
+
+          // first to delete sub folders
+          console.log(`Deleting ${folderToDeletePath}`);
+          for (const folder of folderToDeleteMetadata.metadata.folders) {
+            await this._deleteHandler(
+              folderToDeletePath,
+              [{ name: folder.name, handle: folder.handle }],
+              deleteFiles
+            );
+          }
+
+          // then delete the files of the folder
+          if (deleteFiles) {
+            const filesToDelete = [];
+            folderToDeleteMetadata.metadata.files.map((file) =>
+              filesToDelete.push({
+                name: file.name,
+                handle: file.versions[0].handle,
+              })
+            );
+            await this._deleteHandler(
+              folderToDeletePath,
+              filesToDelete,
+              deleteFiles
+            );
+          }
+
+          // then delete the folder itself
+          const requestBody = {
+            timestamp: Date.now(),
+            metadataKey: folderToDelete.handle,
+          };
+          const requestBodyJson = JSON.stringify(requestBody);
+          const payload = this._signPayload(requestBodyJson);
+          const payloadJson = JSON.stringify(payload);
+
+          const response = await Axios.post(
+            this.baseUrl + "metadata/delete",
+            payloadJson
+          );
+
+          if (response.status === 200) {
+            foldersToDelete.push(folderToDelete.handle);
+            console.log(`Deleted ${folderToDelete.name}`);
+          } else {
+            console.log(response);
+          }
+        } catch (e) {
+          console.log(`Failed to delete folder ${folderToDelete.name}`);
+          console.log(error);
         }
       }
+    }
 
-      const requestBody = {
-        timestamp: Date.now(),
-        metadataKey: handle,
-      };
-      const requestBodyJson = JSON.stringify(requestBody);
-      const payload = this._signPayload(requestBodyJson);
-      const payloadJson = JSON.stringify(payload);
-
-      const response = await Axios.post(
-        this.baseUrl + 'metadata/delete',
-        payloadJson
-      );
-
-      // Delete the folder now by removing the folder from the parent folder
-
+    // in the end remove the folders you deleted from the parent folder
+    if (foldersToDelete.length !== 0) {
+      const metadata = await this.getFolderMetadata(folder);
       const newFolders = metadata.metadata.folders.filter(
-        (folder) => folder.handle !== handle
+        (f) => !foldersToDelete.includes(f.handle)
       );
       metadata.metadata.folders = newFolders;
       await this._setMetadata(metadata);
-      console.log(`Deleted ${newFolderPath}`);
-      return true;
+      console.log(`Finished folder deletion inside of ${folder}`);
     }
+    return true;
   }
 
   async _setMetadata(metadata) {
@@ -255,10 +295,10 @@ class OpacityAccount extends EventEmitter {
 
     const encryptedFolderMetadata = Utils.encrypt(
       folderMetadataString,
-      Buffer.from(keyString, 'hex')
+      Buffer.from(keyString, "hex")
     );
     const encryptedFolderMetadataBase64 = encryptedFolderMetadata.toString(
-      'base64'
+      "base64"
     );
 
     const rawPayload = {
@@ -272,7 +312,7 @@ class OpacityAccount extends EventEmitter {
     const payloadJson = JSON.stringify(payload);
 
     const response = await Axios.post(
-      this.baseUrl + 'metadata/set',
+      this.baseUrl + "metadata/set",
       payloadJson
     );
   }
@@ -312,7 +352,7 @@ class OpacityAccount extends EventEmitter {
   }
 
   async _uploadFile(folder, filePath) {
-    let handleHexError = '';
+    let handleHexError = "";
     try {
       const fileName = Path.basename(filePath);
       const stats = Fs.statSync(filePath);
@@ -320,12 +360,12 @@ class OpacityAccount extends EventEmitter {
         path: filePath,
         name: fileName,
         size: stats.size,
-        type: '',
+        type: "",
       };
 
       const metadataToCheckIn = await this.getFolderMetadata(folder);
       for (const file of metadataToCheckIn.metadata.files) {
-        if (file.name === fileData['name']) {
+        if (file.name === fileData["name"]) {
           console.log(`File: ${fileData.name} already exists`);
           return;
         }
@@ -343,10 +383,10 @@ class OpacityAccount extends EventEmitter {
         keyBytes
       );
 
-      const handleHex = handle.toString('hex');
+      const handleHex = handle.toString("hex");
       handleHexError = handleHex;
       console.log(`Uploading file: ${fileData.name} as ${handleHex}`);
-      this.emit('upload:init', { handle: handleHex, fileName: fileData.name });
+      this.emit("upload:init", { handle: handleHex, fileName: fileData.name });
       const fileId = handleHex.slice(0, 64);
 
       let requestBody = {
@@ -361,12 +401,12 @@ class OpacityAccount extends EventEmitter {
         metadata: encryptedFileMetadataJson,
       });
 
-      let response = await Axios.post(this.baseUrl + 'init-upload', form, {
+      let response = await Axios.post(this.baseUrl + "init-upload", form, {
         headers: form.getHeaders(),
       });
 
       if (response.status !== 200) {
-        console.log('File initiation failed');
+        console.log("File initiation failed");
         console.log(response);
       }
 
@@ -394,10 +434,10 @@ class OpacityAccount extends EventEmitter {
       const payload = this._signPayload(requestBodyJson);
       const payloadJson = JSON.stringify(payload);
 
-      response = await Axios.post(this.baseUrl + 'upload-status', payloadJson);
+      response = await Axios.post(this.baseUrl + "upload-status", payloadJson);
 
-      if (response.data.status === 'chunks missing') {
-        console.log('retrying upload');
+      if (response.data.status === "chunks missing") {
+        console.log("retrying upload");
         const retries = 3;
         for (let retry = 0; retry < retries; retry++) {
           let missingParts = response.data.missingIndexes;
@@ -415,10 +455,10 @@ class OpacityAccount extends EventEmitter {
             );
           }
           response = await Axios.post(
-            this.baseUrl + 'upload-status',
+            this.baseUrl + "upload-status",
             payloadJson
           );
-          if (response.data.status === 'File is uploaded') {
+          if (response.data.status === "File is uploaded") {
             break;
           } else {
             if (retry === 2) {
@@ -476,13 +516,13 @@ class OpacityAccount extends EventEmitter {
     await uploadChunksSemaphore.wait();
     try {
       this.emit(
-        `upload:progress:${handle.toString('hex')}`,
+        `upload:progress:${handle.toString("hex")}`,
         currentIndex + 1 !== endIndex
           ? ((currentIndex / endIndex) * 100).toFixed(2)
           : 99.9
       );
       console.log(`Uploading Part ${currentIndex + 1} out of ${endIndex}`);
-      const fileId = handle.slice(0, 32).toString('hex');
+      const fileId = handle.slice(0, 32).toString("hex");
       const keyBytes = handle.slice(32, 64);
 
       const rawpart = await Utils.getPartial(
@@ -522,7 +562,7 @@ class OpacityAccount extends EventEmitter {
       });
 
       //const time = Date.now();
-      const response = await Axios.post(this.baseUrl + 'upload', form, {
+      const response = await Axios.post(this.baseUrl + "upload", form, {
         headers: form.getHeaders(),
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
@@ -552,16 +592,16 @@ class OpacityAccount extends EventEmitter {
 
   async _downloadFile(handle, savingPath) {
     const fileId = handle.slice(0, 64);
-    const fileKey = Buffer.from(handle.slice(64, 128), 'hex');
+    const fileKey = Buffer.from(handle.slice(64, 128), "hex");
 
     const payloadJson = JSON.stringify({ fileID: fileId });
-    let response = await Axios.post(this.baseUrl + 'download', payloadJson);
+    let response = await Axios.post(this.baseUrl + "download", payloadJson);
 
     const downloadUrl = response.data.fileDownloadUrl;
 
     // Get file metadata
-    response = await Axios.get(downloadUrl + '/metadata', {
-      responseType: 'arraybuffer',
+    response = await Axios.get(downloadUrl + "/metadata", {
+      responseType: "arraybuffer",
     });
 
     const encryptedMetadata = response.data;
@@ -569,7 +609,7 @@ class OpacityAccount extends EventEmitter {
     const decryptedMetadataJson = JSON.parse(decryptedMetadata);
     const fileMetadata = FileMetadata.toObject(decryptedMetadataJson);
 
-    this.emit('download:init', {
+    this.emit("download:init", {
       handle: handle,
       fileName: fileMetadata.name,
     });
@@ -582,14 +622,14 @@ class OpacityAccount extends EventEmitter {
       fileMetadata.name,
       Path.extname(fileMetadata.name)
     );
-    const folderPath = Path.join(savingPath, 'tmp', fileWithoutExtension);
+    const folderPath = Path.join(savingPath, "tmp", fileWithoutExtension);
     if (!Fs.existsSync(folderPath)) {
       Fs.mkdirSync(folderPath, { recursive: true });
     }
 
     // Download all parts
     //console.log(`Downloading file: ${fileMetadata.name}`);
-    const fileDownloadUrl = downloadUrl + '/file';
+    const fileDownloadUrl = downloadUrl + "/file";
 
     const downloadChunksSemaphore = new Semaphore(this.maxDownloadChunks);
     const promises = [];
@@ -614,7 +654,7 @@ class OpacityAccount extends EventEmitter {
     //console.log('Total time: ' + (Date.now() - time) / 1000);
 
     // Reconstruct file out of the parts
-    console.log('Reconstructing');
+    console.log("Reconstructing");
     const chunkSize = fileMetadata.p.blockSize + Constants.BLOCK_OVERHEAD;
     const chunksAmount = Math.floor(uploadSize / chunkSize) + 1;
 
@@ -624,11 +664,11 @@ class OpacityAccount extends EventEmitter {
       Fs.unlinkSync(savePath);
     }
 
-    const outputFile = Fs.createWriteStream(savePath, { encoding: 'binary' });
+    const outputFile = Fs.createWriteStream(savePath, { encoding: "binary" });
     let fileIndex = 0;
     let seek = 0;
-    let partPath = Path.join(folderPath, fileIndex + '.part');
-    let myBinaryFile = new BinaryFile(partPath, 'r');
+    let partPath = Path.join(folderPath, fileIndex + ".part");
+    let myBinaryFile = new BinaryFile(partPath, "r");
     await myBinaryFile.open();
     for (let chunkIndex = 0; chunkIndex < chunksAmount; chunkIndex++) {
       let chunkRawBytes;
@@ -650,8 +690,8 @@ class OpacityAccount extends EventEmitter {
 
       if (seek === 0 && chunkIndex + 1 !== chunksAmount) {
         await myBinaryFile.close();
-        partPath = Path.join(folderPath, fileIndex + '.part');
-        myBinaryFile = new BinaryFile(partPath, 'r');
+        partPath = Path.join(folderPath, fileIndex + ".part");
+        myBinaryFile = new BinaryFile(partPath, "r");
         await myBinaryFile.open();
       }
     }
@@ -695,10 +735,10 @@ class OpacityAccount extends EventEmitter {
       }
       const range = `bytes=${byteFrom}-${byteTo - 1}`;
       const response = await Axios.get(fileDownloadUrl, {
-        responseType: 'arraybuffer',
+        responseType: "arraybuffer",
         headers: { range },
       });
-      const fileToWriteTo = Path.join(folderPath, partIndex + '.part');
+      const fileToWriteTo = Path.join(folderPath, partIndex + ".part");
       Fs.writeFileSync(fileToWriteTo, response.data);
     } finally {
       downloadChunksSemaphore.signal();
@@ -710,9 +750,9 @@ class OpacityAccount extends EventEmitter {
 
     if (!Fs.existsSync(newFolderPath)) {
       Fs.mkdirSync(newFolderPath, { recursive: true });
-      console.log('Created Folder!');
+      console.log("Created Folder!");
     } else {
-      console.log('Folder exists already');
+      console.log("Folder exists already");
     }
 
     const opacityPath = Utils.getSlash(
@@ -772,7 +812,7 @@ class OpacityAccount extends EventEmitter {
 
     try {
       const response = await Axios.post(
-        this.baseUrl + 'metadata/create',
+        this.baseUrl + "metadata/create",
         payloadJson
       );
     } catch (e) {
@@ -826,7 +866,11 @@ class OpacityAccount extends EventEmitter {
         const newFolderPath = Utils.getSlash(Path.join(folder, newName));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
-        await this._deleteHandler(folder, item.handle, false);
+        await this._deleteHandler(
+          folder,
+          [{ name: item.name, handle: item.handle }],
+          false
+        );
       }
     } finally {
       release();
@@ -835,7 +879,7 @@ class OpacityAccount extends EventEmitter {
 
   async moveItem(fromFolder, item, toFolder) {
     const release = await this.metadataMutex.acquire();
-    this.emit('move:init', { fileName: item.name, handle: item.handle });
+    this.emit("move:init", { fileName: item.name, handle: item.handle });
     try {
       if (item.handle.length === 128) {
         const fromFolderMetadata = await this.getFolderMetadata(fromFolder);
@@ -872,7 +916,11 @@ class OpacityAccount extends EventEmitter {
         const newFolderPath = Utils.getSlash(Path.join(toFolder, item.name));
         await this._createFolderHandler(newFolderPath);
         await this._copyMetadata(oldFolderPath, newFolderPath);
-        await this._deleteHandler(fromFolder, item.handle, false);
+        await this._deleteHandler(
+          fromFolder,
+          [{ name: item.name, handle: item.handle }],
+          false
+        );
         console.log(
           `Moved folder: ${item.name} from ${fromFolder} to ${toFolder}`
         );
