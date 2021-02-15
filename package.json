@@ -24,7 +24,7 @@
   "dependencies": {
     "aes-256-gcm": "^1.0.3",
     "async-mutex": "^0.2.3",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "binary-file": "^0.2.3",
     "bip32": "^2.0.5",
     "bootstrap": "^4.5.0",
@@ -60,7 +60,7 @@
     "babili-webpack-plugin": "^0.1.2",
     "cross-env": "^7.0.2",
     "css-loader": "^3.5.3",
-    "electron": "^8.2.5",
+    "electron": "^9.4.0",
     "electron-devtools-installer": "^3.0.0",
     "electron-packager": "^14.2.1",
     "file-loader": "^6.0.0",
