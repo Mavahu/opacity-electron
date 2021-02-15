@@ -24,7 +24,7 @@
   "dependencies": {
     "aes-256-gcm": "^1.0.3",
     "async-mutex": "^0.2.3",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "binary-file": "^0.2.3",
     "bip32": "^2.0.5",
     "bootstrap": "^4.5.0",
