@@ -318,13 +318,10 @@ class OpacityAccount extends EventEmitter {
   }
 
   async upload(folder, fileOrFolderPath) {
-    await this.uploadSemaphore.wait();
     try {
       return await this._uploadHandler(folder, fileOrFolderPath);
     } catch (e) {
       console.log(e);
-    } finally {
-      this.uploadSemaphore.signal();
     }
   }
 
@@ -343,15 +340,18 @@ class OpacityAccount extends EventEmitter {
 
     const response = await this.createFolder(finalPath);
 
+    const promises = [];
     const files = Fs.readdirSync(folderPath);
     for (let index = 0; index < files.length; index++) {
       const toUpload = Path.join(folderPath, files[index]);
-      await this._uploadHandler(finalPath, toUpload);
+      promises.push(this._uploadHandler(finalPath, toUpload));
     }
+    await Promise.allSettled(promises);
     return response;
   }
 
   async _uploadFile(folder, filePath) {
+    await this.uploadSemaphore.wait();
     let handleHexError = "";
     try {
       const fileName = Path.basename(filePath);
@@ -502,6 +502,8 @@ class OpacityAccount extends EventEmitter {
       console.log(`Upload failed of ${handleHexError}`);
       console.log(e);
       this.emit(`upload:failed:${handleHexError}`);
+    } finally {
+      this.uploadSemaphore.signal();
     }
   }
 
