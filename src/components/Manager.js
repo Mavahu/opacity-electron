@@ -2,7 +2,8 @@ import { ipcRenderer } from 'electron';
 const { dialog } = require('electron').remote;
 import Path from 'path';
 import React, { useState, useEffect, useRef } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
+import { useHistory } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import Container from 'react-bootstrap/Container';
 import Table from 'react-bootstrap/Table';
 import Button from 'react-bootstrap/Button';
@@ -22,6 +23,7 @@ const Checkbox = Styled.input.attrs({
 })``;
 
 const Manager = () => {
+  const history = useHistory();
   const [folderPath, setFolderPath] = useState('/');
   //reference needed to use folderPath in useEffect
   const refFolderPath = useRef(folderPath);
@@ -59,6 +61,16 @@ const Manager = () => {
         modifyMetadataAndSetIt(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
+    });
+
+    ipcRenderer.on('settings:open', () => {
+      ipcRenderer.removeAllListeners('metadata:set');
+      ipcRenderer.removeAllListeners('settings:open');
+      ipcRenderer.removeAllListeners('toast:create');
+      ipcRenderer.removeAllListeners('toast:update');
+      ipcRenderer.removeAllListeners('toast:finished');
+      console.log('opening settings');
+      history.push('settings');
     });
   }, []);
 
@@ -173,10 +185,10 @@ const Manager = () => {
     ipcRenderer.send('path:update', traversedPath);
   }
 
-  async function deleteFunc(handle, toDelete) {
+  async function deleteFunc(handle, name) {
     const { value: result } = await Swal.fire({
       title: 'Are you sure?',
-      html: `You won't be able to revert this!<br/>Deleting: ${toDelete}`,
+      html: `You won't be able to revert this!<br/>Deleting: ${name}`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -185,13 +197,10 @@ const Manager = () => {
     });
 
     if (result) {
-      ipcRenderer.send('files:delete', [
-        {
-          folder: folderPath,
+      ipcRenderer.send('files:delete', { folder: folderPath, files: [{
           handle: handle,
-          name: toDelete,
-        },
-      ]);
+          name: name,
+        }] });
       changeAllCheckboxState(false);
     }
   }
@@ -208,6 +217,7 @@ const Manager = () => {
             files: item,
             savingPath: result.filePaths[0],
           });
+          changeAllCheckboxState(false);
         }
       })
       .catch((err) => {
@@ -408,16 +418,6 @@ const Manager = () => {
               </div>
             );
         })()}
-        <ToastContainer
-          position="bottom-right"
-          limit={7}
-          hideProgressBar={false}
-          autoClose={false}
-          newestOnTop={true}
-          closeOnClick={true}
-          draggable={false}
-          rtl={false}
-        />
       </Container>
     </DragAndDropzone>
   );

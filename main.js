@@ -5,6 +5,7 @@ const url = require('url');
 const keytar = require('keytar');
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const OpacityAccount = require('./opacity/OpacityAccount');
+const storage = require('electron-settings');
 
 let mainWindow;
 let account;
@@ -73,7 +74,8 @@ function createMainWindow() {
 app.on('ready', () => {
   createMainWindow();
   const mainMenu = Menu.buildFromTemplate(menu);
-  Menu.setApplicationMenu(mainMenu);
+  Menu.setApplicationMenu(null);
+  mainWindow.setMenu(mainMenu);
 });
 
 const menu = [
@@ -84,6 +86,10 @@ const menu = [
       {
         label: 'Reset Handle',
         click: () => resetHandle(),
+      },
+      {
+        label: 'Settings',
+        click: () => settingsPage(),
       },
       isMac ? { role: 'close' } : { role: 'quit' },
     ],
@@ -104,6 +110,10 @@ const menu = [
       ]
     : []),
 ];
+
+async function settingsPage() {
+  mainWindow.webContents.send('settings:open');
+}
 
 async function resetHandle() {
   await keytar.deletePassword('Opacity', 'Handle');
@@ -147,17 +157,16 @@ ipcMain.on('path:update', async (e, newPath) => {
 });
 
 ipcMain.on('files:delete', async (e, files) => {
-  for (const file of files) {
-    if (await account.delete(file.folder, file.handle, file.name)) {
-      refreshFolder(file.folder);
-    }
-    mainWindow.webContents.send(`file:deleted:${file.handle}`);
+  console.log(files);
+  if (await account.delete(files.folder, files.files)) {
+    refreshFolder(files.folder);
   }
+  //mainWindow.webContents.send(`file:deleted:${file.handle}`);
 });
 
 ipcMain.on('files:upload', async (e, toUpload) => {
   for (const file of toUpload.files) {
-    await account.upload(toUpload.folder, file).then((response) => {
+    account.upload(toUpload.folder, file).then((response) => {
       if (response) {
         refreshFolder(toUpload.folder);
       }
@@ -167,7 +176,7 @@ ipcMain.on('files:upload', async (e, toUpload) => {
 
 ipcMain.on('files:download', async (e, toDownload) => {
   for (const file of toDownload.files) {
-    await account.download(toDownload.folder, file, toDownload.savingPath);
+    account.download(toDownload.folder, file, toDownload.savingPath);
   }
 });
 
@@ -193,8 +202,45 @@ ipcMain.on('files:move', async (e, moveObj) => {
   }
 });
 
+ipcMain.on('semaphore:update', async (e, semaphoreValues) => {
+  const currentSemaphores = storage.get('settings');
+
+  const UploadSemaphoreDifference =
+    currentSemaphores.maxSimultaneousUploads -
+    semaphoreValues.maxSimultaneousUploads;
+  console.log(UploadSemaphoreDifference);
+  if (UploadSemaphoreDifference > 0) {
+    account.decreaseUploadSemaphore(UploadSemaphoreDifference);
+  } else if (UploadSemaphoreDifference < 0) {
+    account.increaseUploadSemaphore(Math.abs(UploadSemaphoreDifference));
+  }
+
+  const DownloadSemaphoreDifference =
+    currentSemaphores.maxSimultaneousDownloads -
+    semaphoreValues.maxSimultaneousDownloads;
+  console.log(DownloadSemaphoreDifference);
+  if (DownloadSemaphoreDifference > 0) {
+    account.decreaseDownloadSemaphore(DownloadSemaphoreDifference);
+  } else if (DownloadSemaphoreDifference < 0) {
+    account.increaseDownloadSemaphore(Math.abs(DownloadSemaphoreDifference));
+  }
+
+  storage.set('settings', semaphoreValues);
+});
+
 async function setAccount(handle) {
-  account = new OpacityAccount(handle);
+  const userSettings = await storage.get('settings');
+  console.log(userSettings);
+  if (userSettings) {
+    account = new OpacityAccount(
+      handle,
+      userSettings.maxSimultaneousDownloads,
+      userSettings.maxSimultaneousUploads
+    );
+  } else {
+    account = new OpacityAccount(handle, 1, 1);
+  }
+
   await account.checkAccountStatus();
 
   // set up listeners

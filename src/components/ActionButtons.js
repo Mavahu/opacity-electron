@@ -92,19 +92,17 @@ const ActionButtons = ({
       const toDelete = [];
       checkedFolders.map((folder) =>
         toDelete.push({
-          folder: folderPath,
           handle: folder.handle,
           name: folder.name,
         })
       );
       checkedFiles.map((file) =>
         toDelete.push({
-          folder: folderPath,
           handle: file.versions[0].handle,
           name: file.name,
         })
       );
-      ipcRenderer.send('files:delete', toDelete);
+      ipcRenderer.send('files:delete', { folder: folderPath, files: toDelete });
       changeAllCheckboxState(false);
     }
   }
@@ -114,7 +112,7 @@ const ActionButtons = ({
       title: 'Enter the folder name',
       input: 'text',
       showCancelButton: true,
-      cancelButtonColor: '#d33',
+      cancelButtonColor: '#dd3333',
       inputValidator: (value) => {
         if (!value) {
           return 'You need to write something!';
@@ -163,7 +161,7 @@ const ActionButtons = ({
       <Card>
         {cutButton.cut ? (
           <Button disabled={!massButtons} onClick={() => cutAndPaste()}>
-            Cut
+            Move
           </Button>
         ) : (
           <ButtonGroup>

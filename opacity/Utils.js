@@ -1,7 +1,7 @@
-import Constants from "./models/Constants";
+import Constants from './models/Constants';
 import * as Aes from 'aes-256-gcm';
 import BinaryFile from 'binary-file';
-import Crypto from "crypto"
+import Crypto from 'crypto';
 import keccak256 from 'keccak256';
 
 export function getFolderHDKey(key, folder) {
@@ -26,11 +26,13 @@ export function hashToPath(hash) {
 }
 
 export function generateHashedFolderKey(folderKey) {
-  return keccak256(folderKey.publicKey.toString('hex')).toString('hex');
+  const ttt = keccak256(folderKey.publicKey.toString('hex')).toString('hex');
+  return ttt;
 }
 
 export function generateFolderKeystring(folderKey) {
-  return keccak256(folderKey.privateKey.toString('hex')).toString('hex');
+  const ttt =  keccak256(folderKey.privateKey.toString('hex')).toString('hex');
+  return ttt;
 }
 
 export function decrypt(encryptedData, key) {
