@@ -23,7 +23,14 @@ import Semaphore from "simple-semaphore";
 class OpacityAccount extends EventEmitter {
   baseUrl = "https://broker-1.opacitynodes.com:3000/api/v1/";
 
-  constructor(handle, maxSimultaneousDownloads, maxSimultaneousUploads) {
+  constructor(
+    handle,
+    maxSimultaneousDownloads,
+    maxSimultaneousUploads,
+    activateSync,
+    upOrDownSync,
+    syncFolder
+  ) {
     super();
     this.handle = handle;
     this.privateKey = handle.slice(0, 64);
@@ -38,6 +45,11 @@ class OpacityAccount extends EventEmitter {
     this.maxUploadChunks = 8;
     // aquire this mutex, when you modify the metadata to make sure to not miss a metadata update
     this.metadataMutex = new Mutex();
+    this.upOrDownSync = upOrDownSync;
+    this.syncFolder = syncFolder;
+    console.log(
+      `Sync active: ${activateSync}\nUp-/Down-Sync: ${upOrDownSync}\nSync-Folder:${syncFolder}`
+    );
   }
 
   _signPayload(rawPayload) {
@@ -977,6 +989,16 @@ class OpacityAccount extends EventEmitter {
   async decreaseDownloadSemaphore(value) {
     await this.downloadSemaphore.wait(value);
     console.log(`Sucessfully decreased the DownloadSemaphore by ${value}`);
+  }
+
+  async syncStarter() {
+    if (this.upOrDownSync === "up") {
+    } else if (this.upOrDownSync === "down") {
+    } else {
+      throw EvalError(
+        `Up/Down Sync Value doesn't look right: ${this.upOrDownSync}`
+      );
+    }
   }
 }
 

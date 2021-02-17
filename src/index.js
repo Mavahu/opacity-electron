@@ -1,21 +1,21 @@
-import React from 'react';
-import { render } from 'react-dom';
-import { HashRouter as Router, Route } from 'react-router-dom';
-import LoginForm from './components/LoginForm';
-import Manager from './components/Manager';
-import SettingsPage from './components/SettingsPage';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import React from "react";
+import { render } from "react-dom";
+import { HashRouter as Router, Route } from "react-router-dom";
+import LoginForm from "./components/LoginForm";
+import Manager from "./components/Manager";
+import SettingsPage from "./components/SettingsPage";
+import "bootstrap/dist/css/bootstrap.min.css";
 
-import 'react-toastify/dist/ReactToastify.css';
-import 'core-js/stable';
-import 'regenerator-runtime/runtime';
+import "react-toastify/dist/ReactToastify.css";
+import "core-js/stable";
+import "regenerator-runtime/runtime";
 
-import { ToastContainer, toast } from 'react-toastify';
+import { ToastContainer, toast } from "react-toastify";
 
 // Since we are using HtmlWebpackPlugin WITHOUT a template, we should create our own root node in the body element before rendering into it
-let root = document.createElement('div');
+let root = document.createElement("div");
 
-root.id = 'root';
+root.id = "root";
 document.body.appendChild(root);
 
 // Now we can render our application into it
@@ -39,5 +39,5 @@ render(
       rtl={false}
     />
   </Router>,
-  document.getElementById('root')
+  document.getElementById("root")
 );
