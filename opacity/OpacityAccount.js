@@ -624,10 +624,21 @@ class OpacityAccount extends EventEmitter {
     const decryptedMetadataJson = JSON.parse(decryptedMetadata);
     const fileMetadata = FileMetadata.toObject(decryptedMetadataJson);
 
-    this.emit("download:init", {
-      handle: handle,
-      fileName: fileMetadata.name,
-    });
+    // check if the file exists already if it does then skip the download
+    // or even better if the file exists then check also the size of the file if it contains all parts
+    const checkFile = Path.join(savingPath, fileMetadata.name);
+    if (Fs.existsSync(checkFile)) {
+      const fileStats = Fs.statSync(checkFile);
+      if (fileStats.size === fileMetadata.size) {
+        console.log(
+          `The file ${checkFile} you want to download exists already.\n->Skipping it`
+        );
+        return;
+      }
+      console.log(
+        `The file ${checkFile} you want to download exists already, but with the wrong fileSize.\n->Will be overwritten`
+      );
+    }
 
     const uploadSize = Utils.getUploadSize(fileMetadata.size);
     const partSize = 5245440; // 80 * (Constants.DEFAULT_BLOCK_SIZE + Constants.BLOCK_OVERHEAD)
@@ -641,6 +652,11 @@ class OpacityAccount extends EventEmitter {
     if (!Fs.existsSync(folderPath)) {
       Fs.mkdirSync(folderPath, { recursive: true });
     }
+
+    this.emit("download:init", {
+      handle: handle,
+      fileName: fileMetadata.name,
+    });
 
     // Download all parts
     //console.log(`Downloading file: ${fileMetadata.name}`);
@@ -742,12 +758,25 @@ class OpacityAccount extends EventEmitter {
           ? ((partIndex / endPartIndex) * 100).toFixed(2)
           : 99.9
       );
-      console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
       const byteFrom = partIndex * partSize;
       let byteTo = byteFrom + partSize;
       if (byteTo > uploadSize) {
         byteTo = uploadSize;
       }
+
+      const checkFile = Path.join(folderPath, partIndex + ".part");
+      if (Fs.existsSync(checkFile)) {
+        const fileStats = Fs.statSync(checkFile);
+        if (fileStats.size === byteTo) {
+          console.log(`The part ${checkFile} exists already.\n->Skipping it`);
+          return;
+        }
+        console.log(
+          `The part ${checkFile} exists already, but with the wrong fileSize.\n->Will be overwritten`
+        );
+      }
+
+      console.log(`Downloading part ${partIndex + 1} out of ${endPartIndex}`);
       const range = `bytes=${byteFrom}-${byteTo - 1}`;
       const response = await Axios.get(fileDownloadUrl, {
         responseType: "arraybuffer",
@@ -1002,14 +1031,14 @@ class OpacityAccount extends EventEmitter {
           const toUpload = Path.join(this.syncFolder, files[index]);
           if (await this._uploadHandler("/", toUpload)) {
             this.emit("sync:update");
-            console.log("Synced a file");
+            //console.log("Synced a file");
           }
           //promises.push(this._uploadHandler(finalPath, toUpload));
         }
         //await Promise.allSettled(promises);
-        console.log("synced upwards");
+        //console.log("synced upwards");
         setTimeout(() => {
-          console.log("starting sync again");
+          //console.log("starting sync again");
           this.syncStarter();
         }, 30000);
       }
