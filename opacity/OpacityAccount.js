@@ -47,6 +47,7 @@ class OpacityAccount extends EventEmitter {
     this.metadataMutex = new Mutex();
     this.upOrDownSync = upOrDownSync;
     this.syncFolder = syncFolder;
+    this.syncStarter();
     console.log(
       `Sync active: ${activateSync}\nUp-/Down-Sync: ${upOrDownSync}\nSync-Folder:${syncFolder}`
     );
@@ -379,7 +380,7 @@ class OpacityAccount extends EventEmitter {
       for (const file of metadataToCheckIn.metadata.files) {
         if (file.name === fileData["name"]) {
           console.log(`File: ${fileData.name} already exists`);
-          return;
+          return false;
         }
       }
       const fileMetaData = FileMetadata.toObject(fileData);
@@ -993,7 +994,30 @@ class OpacityAccount extends EventEmitter {
 
   async syncStarter() {
     if (this.upOrDownSync === "up") {
+      // get all files/folders of the folder and upload them
+      if (Fs.existsSync(this.syncFolder)) {
+        //const promises = [];
+        const files = Fs.readdirSync(this.syncFolder);
+        for (let index = 0; index < files.length; index++) {
+          const toUpload = Path.join(this.syncFolder, files[index]);
+          if (await this._uploadHandler("/", toUpload)) {
+            this.emit("sync:update");
+            console.log("Synced a file");
+          }
+          //promises.push(this._uploadHandler(finalPath, toUpload));
+        }
+        //await Promise.allSettled(promises);
+        console.log("synced upwards");
+        setTimeout(() => {
+          console.log("starting sync again");
+          this.syncStarter();
+        }, 30000);
+      }
     } else if (this.upOrDownSync === "down") {
+      if (Fs.existsSync(this.syncFolder)) {
+        // download everything in the main folder to the sync folder
+        // rework download to only download if the file is missing
+      }
     } else {
       throw EvalError(
         `Up/Down Sync Value doesn't look right: ${this.upOrDownSync}`

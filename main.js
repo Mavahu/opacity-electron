@@ -351,6 +351,10 @@ async function setAccount(handle) {
       account.removeAllListeners(`move:failed:${file.handle}`);
     });
   });
+
+  account.on("sync:update", () => {
+    refreshFolder("/");
+  });
 }
 
 async function refreshFolder(folder, force = false) {
