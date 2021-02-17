@@ -808,9 +808,11 @@ class OpacityAccount extends EventEmitter {
       await this._downloadFolder(opacityPath, folder.name, newFolderPath);
     }
 
+    const promises = [];
     for (const file of newMetadata.files) {
-      await this._downloadFile(file.versions[0].handle, newFolderPath);
+      promises.push(this._downloadFile(file.versions[0].handle, newFolderPath));
     }
+    await Promise.allSettled(promises);
   }
 
   async createFolder(folderPath) {
@@ -1045,7 +1047,21 @@ class OpacityAccount extends EventEmitter {
     } else if (this.upOrDownSync === "down") {
       if (Fs.existsSync(this.syncFolder)) {
         // download everything in the main folder to the sync folder
-        // rework download to only download if the file is missing
+        const metadata = (await this.getFolderMetadata("/")).metadata;
+        for (const file of metadata.files) {
+          await this.download(
+            "/",
+            { handle: file.versions[0].handle, name: file.name },
+            this.syncFolder
+          );
+        }
+        for (const folder of metadata.folders) {
+          await this.download(
+            "/",
+            { handle: folder.handle, name: folder.name },
+            this.syncFolder
+          );
+        }
       }
     } else {
       throw EvalError(

@@ -1,23 +1,23 @@
-import React from 'react';
-import Moment from 'react-moment';
-import Filesize from 'filesize';
-import Button from 'react-bootstrap/Button';
-import ButtonGroup from 'react-bootstrap/ButtonGroup';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Tooltip from 'react-bootstrap/Tooltip';
-import Swal from 'sweetalert2';
-import * as Clipboardy from 'clipboardy';
+import React from "react";
+import Moment from "react-moment";
+import Filesize from "filesize";
+import Button from "react-bootstrap/Button";
+import ButtonGroup from "react-bootstrap/ButtonGroup";
+import OverlayTrigger from "react-bootstrap/OverlayTrigger";
+import Tooltip from "react-bootstrap/Tooltip";
+import Swal from "sweetalert2";
+import * as Clipboardy from "clipboardy";
 import {
   AiOutlineFile,
   AiOutlineDownload,
   AiOutlineDelete,
   AiOutlineShareAlt,
-} from 'react-icons/ai';
-import { FiEdit } from 'react-icons/fi';
-import Styled from 'styled-components';
+} from "react-icons/ai";
+import { FiEdit } from "react-icons/fi";
+import Styled from "styled-components";
 
 const Checkbox = Styled.input.attrs({
-  type: 'checkbox',
+  type: "checkbox",
 })``;
 
 const FileTableItem = ({
@@ -28,8 +28,8 @@ const FileTableItem = ({
   changeCheckboxState,
 }) => {
   const shareClick = (handle) => {
-    Clipboardy.write('https://opacity.io/share#handle=' + handle);
-    Swal.fire('', 'Copied the link to your clipboard!', 'success');
+    Clipboardy.write("https://opacity.io/share#handle=" + handle);
+    Swal.fire("", "Copied the link to your clipboard!", "success");
   };
 
   return (

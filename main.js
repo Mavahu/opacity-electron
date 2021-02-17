@@ -259,6 +259,7 @@ async function setAccount(handle) {
   );
 
   await account.checkAccountStatus();
+  mainWindow.webContents.send("account:set", account.accStatus);
 
   // set up listeners
   account.on(`upload:init`, (file) => {
@@ -359,6 +360,7 @@ async function setAccount(handle) {
 
 async function refreshFolder(folder, force = false) {
   const metadata = (await account.getFolderMetadata(folder)).metadata;
+  mainWindow.webContents.send("account:set", account.accStatus);
   mainWindow.webContents.send("metadata:set", {
     metadata: metadata,
     folder: folder,

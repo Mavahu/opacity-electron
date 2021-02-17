@@ -1,76 +1,85 @@
-import { ipcRenderer } from 'electron';
-const { dialog } = require('electron').remote;
-import Path from 'path';
-import React, { useState, useEffect, useRef } from 'react';
-import { useHistory } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import Container from 'react-bootstrap/Container';
-import Table from 'react-bootstrap/Table';
-import Button from 'react-bootstrap/Button';
-import ButtonGroup from 'react-bootstrap/ButtonGroup';
-import ButtonToolbar from 'react-bootstrap/ButtonToolbar';
-import Card from 'react-bootstrap/Card';
-import Swal from 'sweetalert2';
-import Styled from 'styled-components';
-import * as Utils from './../../opacity/Utils';
-import FileTableItem from './FileTableItem';
-import FolderTableItem from './FolderTableItem';
-import DragAndDropzone from './DragAndDropzone';
-import ActionButtons from './ActionButtons';
+import { ipcRenderer } from "electron";
+const { dialog } = require("electron").remote;
+import Path from "path";
+import React, { useState, useEffect, useRef } from "react";
+import { useHistory } from "react-router-dom";
+import { toast } from "react-toastify";
+import Container from "react-bootstrap/Container";
+import Row from "react-bootstrap/Row";
+import Col from "react-bootstrap/Col";
+import ProgressBar from "react-bootstrap/ProgressBar";
+import Table from "react-bootstrap/Table";
+import Button from "react-bootstrap/Button";
+import ButtonGroup from "react-bootstrap/ButtonGroup";
+import ButtonToolbar from "react-bootstrap/ButtonToolbar";
+import Card from "react-bootstrap/Card";
+import Swal from "sweetalert2";
+import Styled from "styled-components";
+import * as Utils from "./../../opacity/Utils";
+import FileTableItem from "./FileTableItem";
+import FolderTableItem from "./FolderTableItem";
+import DragAndDropzone from "./DragAndDropzone";
+import ActionButtons from "./ActionButtons";
 
 const Checkbox = Styled.input.attrs({
-  type: 'checkbox',
+  type: "checkbox",
 })``;
 
 const Manager = () => {
   const history = useHistory();
-  const [folderPath, setFolderPath] = useState('/');
+  const [folderPath, setFolderPath] = useState("/");
   //reference needed to use folderPath in useEffect
   const refFolderPath = useRef(folderPath);
   refFolderPath.current = folderPath;
-  const [folders, setFolders] = useState(['All Files']);
+  const [folders, setFolders] = useState(["All Files"]);
   const [metadata, setMetadata] = useState(false);
   const defaultSorts = {
     name: {
       show: false,
       ascending: true,
-      icon: '',
+      icon: "",
     },
     size: {
       show: false,
       ascending: true,
-      icon: '',
+      icon: "",
     },
     createdDate: {
       show: false,
       ascending: true,
-      icon: '',
+      icon: "",
     },
     icons: {
-      down: '▼',
-      up: '▲',
+      down: "▼",
+      up: "▲",
     },
   };
   const [sorts, setSorts] = useState(JSON.parse(JSON.stringify(defaultSorts)));
   const [selectAllCheckbox, setSelectAllCheckbox] = useState(false);
   const [massButtons, setMassButtons] = useState(false);
+  const [userData, setUserData] = useState(false);
 
   useEffect(() => {
-    ipcRenderer.on('metadata:set', (e, newMetadata) => {
+    ipcRenderer.on("account:set", (e, accountData) => {
+      console.log(accountData);
+      setUserData(accountData);
+    });
+
+    ipcRenderer.on("metadata:set", (e, newMetadata) => {
       if (newMetadata.folder === refFolderPath.current || newMetadata.force) {
         modifyMetadataAndSetIt(newMetadata.metadata);
         setSorts(JSON.parse(JSON.stringify(defaultSorts)));
       }
     });
 
-    ipcRenderer.on('settings:open', () => {
-      ipcRenderer.removeAllListeners('metadata:set');
-      ipcRenderer.removeAllListeners('settings:open');
-      ipcRenderer.removeAllListeners('toast:create');
-      ipcRenderer.removeAllListeners('toast:update');
-      ipcRenderer.removeAllListeners('toast:finished');
-      console.log('opening settings');
-      history.push('settings');
+    ipcRenderer.on("settings:open", () => {
+      ipcRenderer.removeAllListeners("metadata:set");
+      ipcRenderer.removeAllListeners("settings:open");
+      ipcRenderer.removeAllListeners("toast:create");
+      ipcRenderer.removeAllListeners("toast:update");
+      ipcRenderer.removeAllListeners("toast:finished");
+      console.log("opening settings");
+      history.push("settings");
     });
   }, []);
 
@@ -144,21 +153,21 @@ const Manager = () => {
   }
 
   useEffect(() => {
-    ipcRenderer.on('toast:create', (e, data) =>
+    ipcRenderer.on("toast:create", (e, data) =>
       toast(data.text, {
         toastId: data.toastId,
         autoClose: false,
       })
     );
 
-    ipcRenderer.on('toast:update', (e, data) => {
+    ipcRenderer.on("toast:update", (e, data) => {
       toast.update(data.toastId, {
         render: data.text,
         progress: data.percentage / 100.0,
       });
     });
 
-    ipcRenderer.on('toast:finished', (e, data) => {
+    ipcRenderer.on("toast:finished", (e, data) => {
       toast.update(data.toastId, {
         render: data.text,
       });
@@ -171,7 +180,7 @@ const Manager = () => {
   function updatePath(newPath) {
     const updatedPath = Utils.getSlash(Path.join(folderPath, newPath));
     setFolderPath(updatedPath);
-    ipcRenderer.send('path:update', updatedPath);
+    ipcRenderer.send("path:update", updatedPath);
     setFolders([...folders, newPath]);
   }
 
@@ -179,28 +188,33 @@ const Manager = () => {
     const newPath = folders.slice(0, buttonIndex + 1);
     setFolders(newPath);
     let traversedPath = [...newPath];
-    traversedPath[0] = '/';
+    traversedPath[0] = "/";
     traversedPath = Utils.getSlash(Path.join(...traversedPath));
     setFolderPath(traversedPath);
-    ipcRenderer.send('path:update', traversedPath);
+    ipcRenderer.send("path:update", traversedPath);
   }
 
   async function deleteFunc(handle, name) {
     const { value: result } = await Swal.fire({
-      title: 'Are you sure?',
+      title: "Are you sure?",
       html: `You won't be able to revert this!<br/>Deleting: ${name}`,
-      icon: 'warning',
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
     });
 
     if (result) {
-      ipcRenderer.send('files:delete', { folder: folderPath, files: [{
-          handle: handle,
-          name: name,
-        }] });
+      ipcRenderer.send("files:delete", {
+        folder: folderPath,
+        files: [
+          {
+            handle: handle,
+            name: name,
+          },
+        ],
+      });
       changeAllCheckboxState(false);
     }
   }
@@ -208,11 +222,11 @@ const Manager = () => {
   async function downloadFunc(item) {
     dialog
       .showOpenDialog({
-        properties: ['openDirectory'],
+        properties: ["openDirectory"],
       })
       .then((result) => {
         if (!result.canceled) {
-          ipcRenderer.send('files:download', {
+          ipcRenderer.send("files:download", {
             folder: folderPath,
             files: item,
             savingPath: result.filePaths[0],
@@ -227,23 +241,23 @@ const Manager = () => {
 
   async function renameFunc(item) {
     const { value: newName } = await Swal.fire({
-      title: 'Enter the a new name',
-      input: 'text',
+      title: "Enter the a new name",
+      input: "text",
       inputValue: item.name,
       showCancelButton: true,
       inputValidator: (value) => {
         if (value === item.name) {
-          return 'You need to set a new name!';
+          return "You need to set a new name!";
         }
         if (!value) {
-          return 'Specify a name!';
+          return "Specify a name!";
         }
       },
     });
 
     if (newName) {
-      Swal.fire('', `Renamed ${item.name} into ${newName}`, 'success');
-      ipcRenderer.send('file:rename', {
+      Swal.fire("", `Renamed ${item.name} into ${newName}`, "success");
+      ipcRenderer.send("file:rename", {
         folder: folderPath,
         item,
         newName: newName,
@@ -256,14 +270,14 @@ const Manager = () => {
 
     copyMetadata.folders.sort(function (folderA, folderB) {
       return sorts.name.ascending
-        ? ('' + folderA.name).localeCompare(folderB.name)
-        : ('' + folderB.name).localeCompare(folderA.name);
+        ? ("" + folderA.name).localeCompare(folderB.name)
+        : ("" + folderB.name).localeCompare(folderA.name);
     });
 
     copyMetadata.files.sort(function (fileA, fileB) {
       return sorts.name.ascending
-        ? ('' + fileA.name).localeCompare(fileB.name)
-        : ('' + fileB.name).localeCompare(fileA.name);
+        ? ("" + fileA.name).localeCompare(fileB.name)
+        : ("" + fileB.name).localeCompare(fileA.name);
     });
 
     sorts.name.ascending = !sorts.name.ascending;
@@ -315,79 +329,104 @@ const Manager = () => {
 
   return (
     <DragAndDropzone folderPath={folderPath}>
-      <Container fluid>
-        <ButtonToolbar
-          className="justify-content-between"
-          aria-label="Toolbar with Button groups"
-        >
-          <ButtonGroup>
-            {folders.map((folder, index) => {
-              //if (folders.length - 1 != index) {
+      <Row>
+        <Col xs={2}>
+          {(() => {
+            if (userData)
               return (
-                <Card key={index}>
-                  <Button onClick={() => goBackTo(index)}>{folder}</Button>
-                </Card>
-              );
-              //}
-            })}
-          </ButtonGroup>
-          <ActionButtons
-            metadata={metadata}
-            folderPath={folderPath}
-            massButtons={massButtons}
-            downloadFunc={downloadFunc}
-            changeAllCheckboxState={changeAllCheckboxState}
-          ></ActionButtons>
-        </ButtonToolbar>
-        <Table size="sm">
-          <thead>
-            <tr>
-              <th>
-                <Checkbox
-                  checked={selectAllCheckbox}
-                  onChange={(t) => changeAllCheckboxState(t.target.checked)}
-                />
-              </th>
-              <th></th>
-              <th>
-                <Button variant="outline-secondary" onClick={sortName}>
-                  Name
-                  {sorts.name.show ? ' ' + sorts.name.icon : ''}
-                </Button>
-              </th>
-              <th>
-                <Button variant="outline-secondary" onClick={sortCreated}>
-                  Created
-                  {sorts.createdDate.show ? ' ' + sorts.createdDate.icon : ''}
-                </Button>
-              </th>
-              <th>
-                <Button variant="outline-secondary" onClick={sortSize}>
-                  Size
-                  {sorts.size.show ? ' ' + sorts.size.icon : ''}
-                </Button>
-              </th>
-              <th style={{ fontWeight: 500 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {metadata &&
-              metadata.folders.map((folder, index) => {
-                return (
-                  <FolderTableItem
-                    key={index}
-                    folder={folder}
-                    updatePath={updatePath}
-                    downloadFunc={downloadFunc}
-                    deleteFunc={deleteFunc}
-                    renameFunc={renameFunc}
-                    changeCheckboxState={changeFolderCheckboxState}
+                <Container>
+                  {" "}
+                  <Container>
+                    Your Account-Status: {userData.paymentStatus}
+                  </Container>
+                  {`${userData.account.storageUsed.toFixed(2)} GB out of ${
+                    userData.account.storageLimit
+                  } GB used`}
+                  <ProgressBar
+                    now={
+                      (userData.account.storageUsed /
+                        userData.account.storageLimit) *
+                      100
+                    }
                   />
-                );
-              })}
-            {metadata &&
-              metadata.files.map((file, index) => {
+                </Container>
+              );
+          })()}
+        </Col>
+        <Col xs={10}>
+          <ButtonToolbar
+            className="justify-content-between"
+            aria-label="Toolbar with Button groups"
+          >
+            <ButtonGroup>
+              {folders.map((folder, index) => {
+                //if (folders.length - 1 != index) {
                 return (
+                  <Card key={index}>
+                    <Button onClick={() => goBackTo(index)}>{folder}</Button>
+                  </Card>
+                );
+                //}
+              })}
+            </ButtonGroup>
+            <ActionButtons
+              metadata={metadata}
+              folderPath={folderPath}
+              massButtons={massButtons}
+              downloadFunc={downloadFunc}
+              changeAllCheckboxState={changeAllCheckboxState}
+            >
+              {}
+            </ActionButtons>
+          </ButtonToolbar>
+          <Table size="sm">
+            <thead>
+              <tr>
+                <th>
+                  <Checkbox
+                    checked={selectAllCheckbox}
+                    onChange={(t) => changeAllCheckboxState(t.target.checked)}
+                  />
+                </th>
+                <th></th>
+                <th>
+                  <Button variant="outline-secondary" onClick={sortName}>
+                    Name
+                    {sorts.name.show ? " " + sorts.name.icon : ""}
+                  </Button>
+                </th>
+                <th>
+                  <Button variant="outline-secondary" onClick={sortCreated}>
+                    Created
+                    {sorts.createdDate.show ? " " + sorts.createdDate.icon : ""}
+                  </Button>
+                </th>
+                <th>
+                  <Button variant="outline-secondary" onClick={sortSize}>
+                    Size
+                    {sorts.size.show ? " " + sorts.size.icon : ""}
+                  </Button>
+                </th>
+                <th style={{ fontWeight: 500 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metadata &&
+                metadata.folders.map((folder, index) => {
+                  return (
+                    <FolderTableItem
+                      key={index}
+                      folder={folder}
+                      updatePath={updatePath}
+                      downloadFunc={downloadFunc}
+                      deleteFunc={deleteFunc}
+                      renameFunc={renameFunc}
+                      changeCheckboxState={changeFolderCheckboxState}
+                    />
+                  );
+                })}
+              {metadata &&
+                metadata.files.map((file, index) => (
                   <FileTableItem
                     key={index}
                     file={file}
@@ -396,29 +435,29 @@ const Manager = () => {
                     renameFunc={renameFunc}
                     changeCheckboxState={changeFileCheckboxState}
                   />
-                );
-              })}
-          </tbody>
-        </Table>
-        {(() => {
-          if (
-            metadata &&
-            metadata.files.length === 0 &&
-            metadata.folders.length === 0
-          )
-            return (
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontWeight: 'bold', opacity: 0.8 }}>
-                  There are no items in this folder
-                </p>
-                <p>
-                  Drag files and folders here to upload, or click the upload
-                  button on the top right to browse files from your computer.
-                </p>
-              </div>
-            );
-        })()}
-      </Container>
+                ))}
+            </tbody>
+          </Table>
+          {(() => {
+            if (
+              metadata &&
+              metadata.files.length === 0 &&
+              metadata.folders.length === 0
+            )
+              return (
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ fontWeight: "bold", opacity: 0.8 }}>
+                    There are no items in this folder
+                  </p>
+                  <p>
+                    Drag files and folders here to upload, or click the upload
+                    button on the top right to browse files from your computer.
+                  </p>
+                </div>
+              );
+          })()}
+        </Col>
+      </Row>
     </DragAndDropzone>
   );
 };
