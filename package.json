@@ -38,7 +38,7 @@
     "form-data": "^3.0.0",
     "keccak256": "^1.0.0",
     "keytar": "^6.0.1",
-    "moment": "^2.26.0",
+    "moment": "^2.29.2",
     "react": "^16.13.1",
     "react-bootstrap": "^1.0.1",
     "react-dom": "^16.13.1",
